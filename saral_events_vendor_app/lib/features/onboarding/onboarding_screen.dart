@@ -36,70 +36,68 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
     ];
 
     return Scaffold(
-      body: SafeArea(
-        child: Column(
-          children: [
-            Expanded(
-              child: PageView(
-                controller: _controller,
-                onPageChanged: (i) => setState(() => _index = i),
-                children: pages,
-              ),
+      body: Column(
+        children: [
+          Expanded(
+            child: PageView(
+              controller: _controller,
+              onPageChanged: (i) => setState(() => _index = i),
+              children: pages,
             ),
-            Padding(
-              padding: const EdgeInsets.all(16.0),
-              child: Row(
-                children: [
-                  TextButton(
-                    onPressed: () {
+          ),
+          Padding(
+            padding: const EdgeInsets.all(16.0),
+            child: Row(
+              children: [
+                TextButton(
+                  onPressed: () {
+                    context.read<AppSession>().completeOnboarding();
+                    context.go('/auth/pre');
+                  },
+                  child: Text(
+                    'Skip',
+                    style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                      color: Colors.grey[600],
+                    ),
+                  ),
+                ),
+                const Spacer(),
+                Row(
+                  children: List.generate(
+                    pages.length,
+                    (i) => AnimatedContainer(
+                      duration: const Duration(milliseconds: 200),
+                      margin: const EdgeInsets.symmetric(horizontal: 3),
+                      height: 8,
+                      width: i == _index ? 18 : 8,
+                      decoration: BoxDecoration(
+                        color: i == _index ? Theme.of(context).colorScheme.primary : Colors.grey.shade400,
+                        borderRadius: BorderRadius.circular(999),
+                      ),
+                    ),
+                  ),
+                ),
+                const Spacer(),
+                ElevatedButton(
+                  onPressed: () {
+                    if (_index == pages.length - 1) {
                       context.read<AppSession>().completeOnboarding();
                       context.go('/auth/pre');
-                    },
-                    child: Text(
-                      'Skip',
-                      style: Theme.of(context).textTheme.labelMedium?.copyWith(
-                        color: Colors.grey[600],
-                      ),
+                    } else {
+                      _controller.nextPage(duration: const Duration(milliseconds: 300), curve: Curves.easeInOut);
+                    }
+                  },
+                  child: Text(
+                    _index == pages.length - 1 ? 'Get Started' : 'Next',
+                    style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                      color: Colors.white,
                     ),
                   ),
-                  const Spacer(),
-                  Row(
-                    children: List.generate(
-                      pages.length,
-                      (i) => AnimatedContainer(
-                        duration: const Duration(milliseconds: 200),
-                        margin: const EdgeInsets.symmetric(horizontal: 3),
-                        height: 8,
-                        width: i == _index ? 18 : 8,
-                        decoration: BoxDecoration(
-                          color: i == _index ? Theme.of(context).colorScheme.primary : Colors.grey.shade400,
-                          borderRadius: BorderRadius.circular(999),
-                        ),
-                      ),
-                    ),
-                  ),
-                  const Spacer(),
-                  ElevatedButton(
-                    onPressed: () {
-                      if (_index == pages.length - 1) {
-                        context.read<AppSession>().completeOnboarding();
-                        context.go('/auth/pre');
-                      } else {
-                        _controller.nextPage(duration: const Duration(milliseconds: 300), curve: Curves.easeInOut);
-                      }
-                    },
-                    child: Text(
-                      _index == pages.length - 1 ? 'Get Started' : 'Next',
-                      style: Theme.of(context).textTheme.labelLarge?.copyWith(
-                        color: Colors.white,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
+                ),
+              ],
             ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }

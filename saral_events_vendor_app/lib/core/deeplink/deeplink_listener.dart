@@ -27,9 +27,37 @@ class _DeepLinkListenerState extends State<DeepLinkListener> {
 
   void _handleUri(Uri? uri) {
     if (uri == null) return;
+    
+    // Debug logging
+    print('Deep link received: $uri');
+    print('Scheme: ${uri.scheme}, Host: ${uri.host}');
+    print('Query parameters: ${uri.queryParameters}');
+    
+    // Handle Supabase auth callbacks (primary method)
     if (uri.scheme == 'io.supabase.flutter' && uri.host == 'login-callback') {
+      print('Handling Supabase auth callback');
       if (!mounted) return;
-      // Mark recovery and navigate immediately; some providers omit the 'type' query
+      
+      // Check for password recovery
+      final code = uri.queryParameters['code'];
+      final error = uri.queryParameters['error'];
+      
+      if (error != null) {
+        print('Auth error: $error');
+        return;
+      }
+      
+      if (code != null) {
+        print('Auth code received: $code');
+        // This is a password recovery flow - mark user for recovery
+        context.read<AppSession>().markPasswordRecovery();
+      }
+    }
+    
+    // Handle custom deep links (fallback)
+    if (uri.scheme == 'saralevents' && uri.host == 'reset-password') {
+      print('Handling custom password reset deep link');
+      if (!mounted) return;
       context.read<AppSession>().markPasswordRecovery();
     }
   }

@@ -3,6 +3,7 @@ import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:file_picker/file_picker.dart';
+// import 'package:syncfusion_flutter_pdfviewer/syncfusion_flutter_pdfviewer.dart';
 import 'dart:io';
 import '../../core/state/session.dart';
 import '../../core/theme/app_theme.dart';
@@ -628,25 +629,286 @@ class _DocumentsStep extends StatelessWidget {
     
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Document Preview'),
-        content: SizedBox(
+      builder: (context) => Dialog(
+        insetPadding: const EdgeInsets.all(16),
+        child: Container(
           width: double.maxFinite,
-          height: 300,
-          child: file is File && file.path.endsWith('.pdf')
-              ? const Center(child: Text('PDF Preview'))
-              : file is File
-                  ? Image.file(file, fit: BoxFit.cover)
-                  : const Center(child: Text('File Preview')),
+          height: MediaQuery.of(context).size.height * 0.8,
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(16),
+            color: Colors.white,
+          ),
+          child: Column(
+            children: [
+              // Header
+              Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: AppColors.surface,
+                  borderRadius: const BorderRadius.only(
+                    topLeft: Radius.circular(16),
+                    topRight: Radius.circular(16),
+                  ),
+                ),
+                child: Row(
+                  children: [
+                    Icon(
+                      _getFileIcon(file),
+                      color: AppColors.primary,
+                      size: 24,
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Text(
+                        _getFileName(file),
+                        style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                          fontWeight: FontWeight.w600,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                    IconButton(
+                      onPressed: () => Navigator.pop(context),
+                      icon: const Icon(Icons.close),
+                      style: IconButton.styleFrom(
+                        backgroundColor: Colors.grey.shade200,
+                        shape: const CircleBorder(),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              // Content
+              Expanded(
+                child: Container(
+                  width: double.infinity,
+                  decoration: const BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.only(
+                      bottomLeft: Radius.circular(16),
+                      bottomRight: Radius.circular(16),
+                    ),
+                  ),
+                  child: ClipRRect(
+                    borderRadius: const BorderRadius.only(
+                      bottomLeft: Radius.circular(16),
+                      bottomRight: Radius.circular(16),
+                    ),
+                    child: _buildDocumentPreview(file),
+                  ),
+                ),
+              ),
+            ],
+          ),
         ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Close'),
+      ),
+    );
+  }
+
+  Widget _buildDocumentPreview(dynamic file) {
+    if (file is File) {
+      if (file.path.toLowerCase().endsWith('.pdf')) {
+        return _buildPdfPreview(file);
+      } else if (_isImageFile(file.path)) {
+        return InteractiveViewer(
+          minScale: 0.5,
+          maxScale: 4.0,
+          child: Image.file(
+            file,
+            fit: BoxFit.contain,
+            errorBuilder: (context, error, stackTrace) {
+              return Center(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(
+                      Icons.error_outline,
+                      size: 48,
+                      color: Colors.grey.shade400,
+                    ),
+                    const SizedBox(height: 16),
+                    Text(
+                      'Failed to load image',
+                      style: TextStyle(
+                        color: Colors.grey.shade600,
+                        fontSize: 16,
+                      ),
+                    ),
+                  ],
+                ),
+              );
+            },
+          ),
+        );
+      }
+    } else if (file is PlatformFile) {
+      if (file.extension?.toLowerCase() == 'pdf') {
+        return _buildPdfPreview(File(file.path!));
+      }
+    }
+    
+    // Fallback for unsupported file types
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(
+            Icons.description,
+            size: 64,
+            color: Colors.grey.shade400,
+          ),
+          const SizedBox(height: 16),
+          Text(
+            'Preview not available',
+            style: TextStyle(
+              color: Colors.grey.shade600,
+              fontSize: 18,
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            'This file type cannot be previewed',
+            style: TextStyle(
+              color: Colors.grey.shade500,
+              fontSize: 14,
+            ),
           ),
         ],
       ),
     );
+  }
+
+  Widget _buildPdfPreview(File pdfFile) {
+    final fileSize = pdfFile.lengthSync();
+    final fileName = pdfFile.path.split('/').last;
+    
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Container(
+            width: 120,
+            height: 160,
+            decoration: BoxDecoration(
+              color: Colors.red.shade50,
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: Colors.red.shade200, width: 2),
+            ),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(
+                  Icons.picture_as_pdf,
+                  size: 48,
+                  color: Colors.red.shade400,
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  'PDF',
+                  style: TextStyle(
+                    color: Colors.red.shade600,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 16,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 24),
+          Text(
+            fileName,
+            style: const TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.w600,
+            ),
+            textAlign: TextAlign.center,
+          ),
+          const SizedBox(height: 8),
+          Text(
+            'File Size: ${_formatFileSize(fileSize)}',
+            style: TextStyle(
+              color: Colors.grey.shade600,
+              fontSize: 14,
+            ),
+          ),
+          const SizedBox(height: 24),
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: AppColors.accent,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: AppColors.primary.withOpacity(0.3)),
+            ),
+            child: Column(
+              children: [
+                Icon(
+                  Icons.info_outline,
+                  color: AppColors.primary,
+                  size: 24,
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  'PDF Preview',
+                  style: TextStyle(
+                    color: AppColors.primary,
+                    fontWeight: FontWeight.w600,
+                    fontSize: 16,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  'To view this PDF, you can download it and open with your preferred PDF reader.',
+                  style: TextStyle(
+                    color: Colors.grey.shade700,
+                    fontSize: 12,
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  String _formatFileSize(int bytes) {
+    if (bytes < 1024) return '$bytes B';
+    if (bytes < 1024 * 1024) return '${(bytes / 1024).toStringAsFixed(1)} KB';
+    if (bytes < 1024 * 1024 * 1024) return '${(bytes / (1024 * 1024)).toStringAsFixed(1)} MB';
+    return '${(bytes / (1024 * 1024 * 1024)).toStringAsFixed(1)} GB';
+  }
+
+  IconData _getFileIcon(dynamic file) {
+    if (file is File) {
+      if (file.path.toLowerCase().endsWith('.pdf')) {
+        return Icons.picture_as_pdf;
+      } else if (_isImageFile(file.path)) {
+        return Icons.image;
+      }
+    } else if (file is PlatformFile) {
+      if (file.extension?.toLowerCase() == 'pdf') {
+        return Icons.picture_as_pdf;
+      }
+    }
+    return Icons.description;
+  }
+
+  String _getFileName(dynamic file) {
+    if (file is File) {
+      return file.path.split('/').last;
+    } else if (file is PlatformFile) {
+      return file.name;
+    }
+    return 'Document';
+  }
+
+  bool _isImageFile(String path) {
+    final imageExtensions = ['.jpg', '.jpeg', '.png', '.gif', '.bmp', '.webp'];
+    final extension = path.toLowerCase().substring(path.lastIndexOf('.'));
+    return imageExtensions.contains(extension);
   }
 }
 
@@ -670,10 +932,7 @@ class _DocumentTile extends StatelessWidget {
     return Card(
       margin: const EdgeInsets.only(bottom: 8),
       child: ListTile(
-        leading: Icon(
-          isUploaded ? Icons.check_circle : Icons.upload_file,
-          color: isUploaded ? AppColors.secondary : AppColors.primary,
-        ),
+        leading: _buildLeadingWidget(),
         title: Text(
           title,
           style: TextStyle(
@@ -682,13 +941,33 @@ class _DocumentTile extends StatelessWidget {
           ),
         ),
         subtitle: isUploaded ? Text(
-          file is File ? 'File uploaded' : 'Document uploaded',
+          _getFileInfo(),
           style: TextStyle(color: AppColors.secondary),
         ) : null,
         trailing: isUploaded
-            ? IconButton(
-                icon: const Icon(Icons.visibility, color: AppColors.primary),
-                onPressed: onView,
+            ? Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  if (_isImageFile())
+                    Container(
+                      width: 40,
+                      height: 40,
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: Colors.grey.shade300),
+                      ),
+                      child: ClipRRect(
+                        borderRadius: BorderRadius.circular(8),
+                        child: _buildThumbnail(),
+                      ),
+                    ),
+                  const SizedBox(width: 8),
+                  IconButton(
+                    icon: const Icon(Icons.visibility, color: AppColors.primary),
+                    onPressed: onView,
+                    tooltip: 'View Document',
+                  ),
+                ],
               )
             : TextButton(
                 onPressed: onUpload,
@@ -696,6 +975,113 @@ class _DocumentTile extends StatelessWidget {
               ),
       ),
     );
+  }
+
+  Widget _buildLeadingWidget() {
+    if (!isUploaded) {
+      return Icon(
+        Icons.upload_file,
+        color: AppColors.primary,
+      );
+    }
+
+    if (_isImageFile()) {
+      return Icon(
+        Icons.image,
+        color: AppColors.secondary,
+      );
+    } else if (_isPdfFile()) {
+      return Icon(
+        Icons.picture_as_pdf,
+        color: AppColors.secondary,
+      );
+    } else {
+      return Icon(
+        Icons.check_circle,
+        color: AppColors.secondary,
+      );
+    }
+  }
+
+  Widget _buildThumbnail() {
+    if (file is File && _isImageFile()) {
+      return Image.file(
+        file,
+        fit: BoxFit.cover,
+        errorBuilder: (context, error, stackTrace) {
+          return Container(
+            color: Colors.grey.shade200,
+            child: Icon(
+              Icons.image_not_supported,
+              color: Colors.grey.shade400,
+              size: 20,
+            ),
+          );
+        },
+      );
+    } else if (file is PlatformFile && _isPdfFile()) {
+      return Container(
+        color: Colors.red.shade50,
+        child: Icon(
+          Icons.picture_as_pdf,
+          color: Colors.red.shade400,
+          size: 20,
+        ),
+      );
+    } else if (file is File && _isPdfFile()) {
+      return Container(
+        color: Colors.red.shade50,
+        child: Icon(
+          Icons.picture_as_pdf,
+          color: Colors.red.shade400,
+          size: 20,
+        ),
+      );
+    }
+    
+    return Container(
+      color: Colors.grey.shade200,
+      child: Icon(
+        Icons.description,
+        color: Colors.grey.shade400,
+        size: 20,
+      ),
+    );
+  }
+
+  String _getFileInfo() {
+    if (file is File) {
+      if (_isImageFile()) {
+        return 'Image uploaded';
+      } else if (_isPdfFile()) {
+        return 'PDF uploaded';
+      }
+      return 'File uploaded';
+    } else if (file is PlatformFile) {
+      if (_isPdfFile()) {
+        return 'PDF uploaded';
+      }
+      return 'Document uploaded';
+    }
+    return 'Document uploaded';
+  }
+
+  bool _isImageFile() {
+    if (file is File) {
+      final imageExtensions = ['.jpg', '.jpeg', '.png', '.gif', '.bmp', '.webp'];
+      final extension = file.path.toLowerCase().substring(file.path.lastIndexOf('.'));
+      return imageExtensions.contains(extension);
+    }
+    return false;
+  }
+
+  bool _isPdfFile() {
+    if (file is File) {
+      return file.path.toLowerCase().endsWith('.pdf');
+    } else if (file is PlatformFile) {
+      return file.extension?.toLowerCase() == 'pdf';
+    }
+    return false;
   }
 }
 

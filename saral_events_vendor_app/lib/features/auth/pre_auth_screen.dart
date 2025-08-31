@@ -32,7 +32,7 @@ class PreAuthScreen extends StatelessWidget {
                       Expanded(
                         child: _RoundedImage(
                           asset: 'assets/onboarding/onboarding_1.png',
-                          height: 440,
+                          height: 446,
                         ),
                       ),
                       const SizedBox(width: 16),

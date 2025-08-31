@@ -31,6 +31,13 @@
                 <category android:name="android.intent.category.BROWSABLE" />
                 <data android:scheme="io.supabase.flutter" android:host="login-callback" />
             </intent-filter>
+            <!-- Handle custom app deep links for password reset -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="saralevents" android:host="reset-password" />
+            </intent-filter>
         </activity>
         <!-- Supabase OAuth activity can remain, but Google native flow will be used via GoogleSignIn -->
         <!-- Don't delete the meta-data below.

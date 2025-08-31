@@ -24,10 +24,15 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
     if (!_formKey.currentState!.validate()) return;
     setState(() { _isLoading = true; _message = null; });
     try {
+
+      // Use the proper Supabase deep link scheme
       await Supabase.instance.client.auth.resetPasswordForEmail(
         _emailController.text.trim(),
         redirectTo: 'io.supabase.flutter://login-callback',
       );
+      
+      print('Redirect URL used: io.supabase.flutter://login-callback');
+      
       if (mounted) setState(() => _message = 'Reset email sent if account exists.');
     } catch (e) {
       if (mounted) setState(() => _message = 'Failed: $e');
