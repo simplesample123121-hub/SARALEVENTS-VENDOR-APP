@@ -4,49 +4,36 @@ import 'app_icons.dart';
 
 class SearchBarMinis extends StatelessWidget {
   final String hint;
-  final VoidCallback? onFilter;
-  const SearchBarMinis({super.key, this.hint = 'Search services, bookings...', this.onFilter});
+  final ValueChanged<String>? onChanged;
+  final TextEditingController? controller;
+  const SearchBarMinis({super.key, this.hint = 'Search services, bookings...', this.onChanged, this.controller});
 
   @override
   Widget build(BuildContext context) {
-    return Row(
-      children: [
-        Expanded(
-          child: TextField(
-            decoration: InputDecoration(
-              hintText: hint,
-                             prefixIcon: SizedBox(
-                 width: 8,
-                 height: 8,
-                 child: Center(
-                   child: SvgPicture.string(
-                     AppIcons.searchSvg,
-                     width: 25,
-                     height: 25,
-                     colorFilter: const ColorFilter.mode(Colors.grey, BlendMode.srcIn),
-                   ),
-                 ),
-               ),
-              filled: true,
-              fillColor: Colors.white,
-              contentPadding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
-              border: OutlineInputBorder(borderRadius: BorderRadius.circular(28), borderSide: BorderSide.none),
-              enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(28), borderSide: BorderSide.none),
-              focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(28), borderSide: BorderSide.none),
+    return TextField(
+      controller: controller,
+      decoration: InputDecoration(
+        hintText: hint,
+        prefixIcon: SizedBox(
+          width: 8,
+          height: 8,
+          child: Center(
+            child: SvgPicture.string(
+              AppIcons.searchSvg,
+              width: 25,
+              height: 25,
+              colorFilter: const ColorFilter.mode(Colors.grey, BlendMode.srcIn),
             ),
           ),
         ),
-        const SizedBox(width: 12),
-        InkWell(
-          borderRadius: BorderRadius.circular(28),
-          onTap: onFilter,
-          child: Container(
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(color: Theme.of(context).colorScheme.primary, shape: BoxShape.circle),
-            child: const SvgIcon(AppIcons.filterSvg, size: 18, color: Colors.white),
-          ),
-        )
-      ],
+        filled: true,
+        fillColor: Colors.white,
+        contentPadding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
+        border: OutlineInputBorder(borderRadius: BorderRadius.circular(28), borderSide: BorderSide.none),
+        enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(28), borderSide: BorderSide.none),
+        focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(28), borderSide: BorderSide.none),
+      ),
+      onChanged: onChanged,
     );
   }
 }

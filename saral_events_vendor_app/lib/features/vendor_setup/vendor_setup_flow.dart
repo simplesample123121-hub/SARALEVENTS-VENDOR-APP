@@ -7,6 +7,7 @@ import 'package:file_picker/file_picker.dart';
 import 'dart:io';
 import '../../core/state/session.dart';
 import '../../core/theme/app_theme.dart';
+// import '../../core/supabase/connection_test.dart';
 import 'vendor_service.dart';
 import 'vendor_models.dart';
 
@@ -133,6 +134,17 @@ class _VendorSetupFlowState extends State<VendorSetupFlow> {
             ),
           ),
           
+          // Test connection button (temporary) — commented out
+          // if (_step == 0) Padding(
+          //   padding: const EdgeInsets.all(16.0),
+          //   child: ElevatedButton(
+          //     onPressed: () async {
+          //       await SupabaseConnectionTest.testConnection();
+          //       await SupabaseConnectionTest.testVendorProfileCreation();
+          //     },
+          //     child: const Text('🧪 Test Supabase Connection'),
+          //   ),
+          // ),
           // Content
           Expanded(
             child: PageView(
@@ -253,14 +265,27 @@ class _VendorSetupFlowState extends State<VendorSetupFlow> {
     });
 
     try {
+      print('Starting vendor setup completion...');
+      
+      // Get current user
+      final currentUser = context.read<AppSession>().currentUser;
+      if (currentUser == null) {
+        throw Exception('User not authenticated');
+      }
+      
+      print('Current user: ${currentUser.id}');
+      print('Business name: ${_businessName.text.trim()}');
+      print('Address: ${_address.text.trim()}');
+      print('Category: $_category');
+      
       // Create vendor profile
       final vendorProfile = VendorProfile(
-        userId: context.read<AppSession>().currentUser?.id ?? '',
+        userId: currentUser.id,
         businessName: _businessName.text.trim(),
         address: _address.text.trim(),
         category: _category,
         phoneNumber: _contact.text.trim().isEmpty ? null : _contact.text.trim(),
-        email: context.read<AppSession>().currentUser?.email,
+        email: currentUser.email,
         website: null, // Not collected in current form
         description: _description.text.trim().isEmpty ? null : _description.text.trim(),
         services: [], // Will be populated when services are added
@@ -269,18 +294,42 @@ class _VendorSetupFlowState extends State<VendorSetupFlow> {
         updatedAt: DateTime.now(),
       );
 
+      print('Vendor profile created, saving to Supabase...');
+      
       // Save vendor profile to Supabase
       final savedProfile = await _vendorService.saveVendorProfile(vendorProfile);
+      
+      print('Vendor profile saved successfully: ${savedProfile.id}');
+
+      // Ensure we have a valid vendorId for uploads
+      String? vendorId = savedProfile.id;
+      if (vendorId == null || vendorId.isEmpty) {
+        final refreshed = await _vendorService.getVendorProfile(currentUser.id);
+        vendorId = refreshed?.id;
+        print('Refreshed vendorId for uploads: $vendorId');
+      }
 
       // Upload documents if any
       for (final entry in _documents.entries) {
-        if (entry.value != null && entry.value is File) {
+        if (entry.value != null) {
           try {
-            await _vendorService.uploadDocument(
-              entry.value as File,
-              entry.key,
-              savedProfile.id ?? '',
-            );
+            File? fileToUpload;
+            if (entry.value is File) {
+              fileToUpload = entry.value as File;
+            } else if (entry.value is PlatformFile && (entry.value as PlatformFile).path != null) {
+              fileToUpload = File((entry.value as PlatformFile).path!);
+            }
+            if (fileToUpload != null && vendorId != null && vendorId.isNotEmpty) {
+              print('Uploading document: ${entry.key}, path: ${fileToUpload.path}');
+              await _vendorService.uploadDocument(
+                fileToUpload,
+                entry.key,
+                vendorId,
+              );
+              print('Upload successful: ${entry.key}');
+            } else {
+              print('Skipped upload for ${entry.key}: fileToUpload or vendorId unavailable');
+            }
           } catch (e) {
             print('Failed to upload ${entry.key}: $e');
             // Continue with other documents

@@ -10,6 +10,8 @@ import '../../features/vendor_setup/vendor_setup_flow.dart';
 import '../../features/auth/forgot_password_screen.dart';
 import '../../features/auth/reset_password_screen.dart';
 import '../../features/shell/main_navigation_scaffold.dart';
+import '../../features/profile/business_details_screen.dart';
+import '../../features/profile/documents_screen.dart';
 
 class AppRouter {
   static GoRouter create(AppSession session) {
@@ -64,6 +66,8 @@ class AppRouter {
         GoRoute(path: '/auth/reset', builder: (_, __) => const ResetPasswordScreen()),
         GoRoute(path: '/vendor/setup', builder: (_, __) => const VendorSetupFlow()),
         GoRoute(path: '/app', builder: (_, __) => const MainNavigationScaffold()),
+        GoRoute(path: '/app/business-details', builder: (_, __) => const BusinessDetailsScreen()),
+        GoRoute(path: '/app/documents', builder: (_, __) => const DocumentsScreen()),
       ],
     );
   }

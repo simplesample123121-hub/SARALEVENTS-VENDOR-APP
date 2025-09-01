@@ -1,6 +1,8 @@
 import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:google_sign_in/google_sign_in.dart';
+import '../../features/vendor_setup/vendor_service.dart';
+import '../../features/vendor_setup/vendor_models.dart';
 
 class AppSession extends ChangeNotifier {
   bool _isOnboardingComplete = false;
@@ -8,14 +10,25 @@ class AppSession extends ChangeNotifier {
   bool _isVendorSetupComplete = false;
   bool _isPasswordRecovery = false;
 
+  VendorProfile? _vendorProfile;
+  VendorProfile? get vendorProfile => _vendorProfile;
+
   AppSession() {
-    Supabase.instance.client.auth.onAuthStateChange.listen((event) {
+    Supabase.instance.client.auth.onAuthStateChange.listen((event) async {
       _isAuthenticated = event.session != null || Supabase.instance.client.auth.currentSession != null;
       if (event.event == AuthChangeEvent.passwordRecovery) {
         _isPasswordRecovery = true;
       }
+      await _checkVendorSetup();
       notifyListeners();
     });
+    // Initialize vendor setup status on startup (e.g., hot restart, existing session)
+    _init();
+  }
+
+  Future<void> _init() async {
+    await _checkVendorSetup();
+    notifyListeners();
   }
 
   bool get isOnboardingComplete => _isOnboardingComplete;
@@ -35,6 +48,7 @@ class AppSession extends ChangeNotifier {
     try {
       final res = await Supabase.instance.client.auth.signInWithPassword(email: email, password: password);
       _isAuthenticated = res.session != null || Supabase.instance.client.auth.currentSession != null;
+      await _checkVendorSetup();
     } finally {
       notifyListeners();
     }
@@ -45,6 +59,7 @@ class AppSession extends ChangeNotifier {
       final res = await Supabase.instance.client.auth.signUp(email: email, password: password);
       final hasSession = res.session != null || Supabase.instance.client.auth.currentSession != null;
       _isAuthenticated = hasSession;
+      await _checkVendorSetup();
       return !hasSession; // true if email confirmation likely required
     } finally {
       notifyListeners();
@@ -53,49 +68,61 @@ class AppSession extends ChangeNotifier {
 
   Future<void> signInWithGoogleNative() async {
     try {
-      // Use the Web client ID for serverClientId (this is what the transcript shows)
       const serverClientId = '314736791162-8pq9o3hr42ibap3oesifibeotdamgdj2.apps.googleusercontent.com';
-      
+
       final signIn = GoogleSignIn(
         serverClientId: serverClientId,
-        scopes: const [
-          'email',
-          'profile',
-        ],
+        scopes: const ['email', 'profile'],
       );
-      
-      // Ensure clean session
-      await signIn.signOut();
 
+      await signIn.signOut();
       final account = await signIn.signIn();
       if (account == null) {
         throw Exception('Sign-in cancelled');
       }
-      
+
       final auth = await account.authentication;
       final idToken = auth.idToken;
-      
       if (idToken == null) {
         throw Exception('No Google ID token received');
       }
-      
-      // Sign in to Supabase with the Google ID token
+
       final res = await Supabase.instance.client.auth.signInWithIdToken(
         provider: OAuthProvider.google,
         idToken: idToken,
       );
-      
+
       _isAuthenticated = res.session != null || Supabase.instance.client.auth.currentSession != null;
+      await _checkVendorSetup();
       notifyListeners();
-      
     } catch (e) {
       print('Google Sign-In error: $e');
       rethrow;
     }
   }
 
+  Future<void> _checkVendorSetup() async {
+    final user = Supabase.instance.client.auth.currentUser;
+    if (user == null) {
+      _isVendorSetupComplete = false;
+      _vendorProfile = null;
+      return;
+    }
+    try {
+      final service = VendorService();
+      final profile = await service.getVendorProfile(user.id);
+      _isVendorSetupComplete = profile != null;
+      _vendorProfile = profile;
+    } catch (e) {
+      _isVendorSetupComplete = false;
+      _vendorProfile = null;
+    }
+  }
+
   void completeVendorSetup() {
     _isVendorSetupComplete = true;
+    // Proactively reload vendor profile after setup to refresh UI immediately
+    _checkVendorSetup();
     notifyListeners();
   }
 
@@ -104,6 +131,7 @@ class AppSession extends ChangeNotifier {
     _isAuthenticated = false;
     _isVendorSetupComplete = false;
     _isPasswordRecovery = false;
+    _vendorProfile = null;
     notifyListeners();
   }
 
@@ -115,6 +143,11 @@ class AppSession extends ChangeNotifier {
 
   void markPasswordRecovery() {
     _isPasswordRecovery = true;
+    notifyListeners();
+  }
+
+  Future<void> reloadVendorProfile() async {
+    await _checkVendorSetup();
     notifyListeners();
   }
 }

@@ -58,7 +58,7 @@ class ServiceService {
         } else {
           final parent = categoryMap[row['parent_id']];
           if (parent != null) {
-            parent!.subcategories.add(category);
+            parent.subcategories.add(category);
           }
         }
       }
@@ -99,11 +99,11 @@ class ServiceService {
   }
 
   // Update category
-  Future<bool> updateCategory(String categoryId, String name) async {
+  Future<bool> updateCategory(String categoryId, Map<String, dynamic> updates) async {
     try {
       await _supabase
           .from('categories')
-          .update({'name': name})
+          .update(updates)
           .eq('id', categoryId);
 
       return true;
@@ -147,7 +147,54 @@ class ServiceService {
     }
   }
 
-  // Get services for a category
+  // Force delete category and all its contents
+  Future<bool> forceDeleteCategory(String categoryId) async {
+    try {
+      // First delete all services in this category
+      await _supabase
+          .from('services')
+          .delete()
+          .eq('category_id', categoryId);
+
+      // Then delete all subcategories (recursive)
+      final subcategories = await _supabase
+          .from('categories')
+          .select('id')
+          .eq('parent_id', categoryId);
+
+      for (final subcat in subcategories) {
+        await forceDeleteCategory(subcat['id']);
+      }
+
+      // Finally delete the category itself
+      await _supabase
+          .from('categories')
+          .delete()
+          .eq('id', categoryId);
+
+      return true;
+    } catch (e) {
+      print('Error force deleting category: $e');
+      return false;
+    }
+  }
+
+  // Move all services in a category to root level
+  Future<bool> moveServicesToRoot(String categoryId) async {
+    try {
+      await _supabase
+          .from('services')
+          .update({'category_id': null})
+          .eq('category_id', categoryId);
+
+      return true;
+    } catch (e) {
+      print('Error moving services to root: $e');
+      return false;
+    }
+  }
+
+  // Get services for a category (null => root-level services)
   Future<List<ServiceItem>> getServices(String categoryId) async {
     try {
       final result = await _supabase
@@ -159,6 +206,7 @@ class ServiceService {
 
       return result.map((row) => ServiceItem(
         id: row['id'],
+        categoryId: row['category_id'],
         name: row['name'],
         price: row['price']?.toDouble() ?? 0.0,
         tags: List<String>.from(row['tags'] ?? []),
@@ -166,6 +214,7 @@ class ServiceService {
         media: (row['media_urls'] as List<dynamic>?)
                 ?.map((url) => MediaItem(url: url, type: MediaType.image))
                 .toList() ?? [],
+        enabled: row['is_active'] ?? true, // Map the is_active field to enabled
       )).toList();
     } catch (e) {
       print('Error getting services: $e');
@@ -176,7 +225,7 @@ class ServiceService {
   // Create new service
   Future<ServiceItem?> createService({
     required String name,
-    required String categoryId,
+    String? categoryId,
     required double price,
     required List<String> tags,
     required String description,
@@ -190,7 +239,7 @@ class ServiceService {
           .from('services')
           .insert({
             'vendor_id': vendorId,
-            'category_id': categoryId,
+            'category_id': categoryId, // nullable for root-level service
             'name': name,
             'price': price,
             'tags': tags,
@@ -203,6 +252,7 @@ class ServiceService {
 
       return ServiceItem(
         id: result['id'],
+        categoryId: result['category_id'],
         name: result['name'],
         price: result['price']?.toDouble() ?? 0.0,
         tags: List<String>.from(result['tags'] ?? []),
@@ -210,6 +260,7 @@ class ServiceService {
         media: (result['media_urls'] as List<dynamic>?)
                 ?.map((url) => MediaItem(url: url, type: MediaType.image))
                 .toList() ?? [],
+        enabled: result['is_active'] ?? true, // Map the is_active field to enabled
       );
     } catch (e) {
       print('Error creating service: $e');
@@ -277,6 +328,7 @@ class ServiceService {
 
       return result.map((row) => ServiceItem(
         id: row['id'],
+        categoryId: row['category_id'],
         name: row['name'],
         price: row['price']?.toDouble() ?? 0.0,
         tags: List<String>.from(row['tags'] ?? []),
@@ -284,9 +336,72 @@ class ServiceService {
         media: (row['media_urls'] as List<dynamic>?)
                 ?.map((url) => MediaItem(url: url, type: MediaType.image))
                 .toList() ?? [],
+        enabled: row['is_active'] ?? true, // Map the is_active field to enabled
       )).toList();
     } catch (e) {
       print('Error getting all services: $e');
+      return [];
+    }
+  }
+
+  // Get all services for current vendor (including inactive ones)
+  Future<List<ServiceItem>> getAllServicesWithStatus() async {
+    try {
+      final vendorId = await _getVendorId();
+      if (vendorId == null) return [];
+
+      final result = await _supabase
+          .from('services')
+          .select()
+          .eq('vendor_id', vendorId)
+          .order('created_at', ascending: false);
+
+      return result.map((row) => ServiceItem(
+        id: row['id'],
+        categoryId: row['category_id'],
+        name: row['name'],
+        price: row['price']?.toDouble() ?? 0.0,
+        tags: List<String>.from(row['tags'] ?? []),
+        description: row['description'] ?? '',
+        media: (row['media_urls'] as List<dynamic>?)
+                ?.map((url) => MediaItem(url: url, type: MediaType.image))
+                .toList() ?? [],
+        enabled: row['is_active'] ?? true, // Map the is_active field to enabled
+      )).toList();
+    } catch (e) {
+      print('Error getting all services with status: $e');
+      return [];
+    }
+  }
+
+  // Get only root-level services (no category)
+  Future<List<ServiceItem>> getRootServices() async {
+    try {
+      final vendorId = await _getVendorId();
+      if (vendorId == null) return [];
+
+      final result = await _supabase
+          .from('services')
+          .select()
+          .eq('vendor_id', vendorId)
+          .filter('category_id', 'is', null)
+          .eq('is_active', true)
+          .order('created_at', ascending: false);
+
+      return result.map((row) => ServiceItem(
+        id: row['id'],
+        categoryId: row['category_id'],
+        name: row['name'],
+        price: row['price']?.toDouble() ?? 0.0,
+        tags: List<String>.from(row['tags'] ?? []),
+        description: row['description'] ?? '',
+        media: (row['media_urls'] as List<dynamic>?)
+                ?.map((url) => MediaItem(url: url, type: MediaType.image))
+                .toList() ?? [],
+        enabled: row['is_active'] ?? true, // Map the is_active field to enabled
+      )).toList();
+    } catch (e) {
+      print('Error getting root services: $e');
       return [];
     }
   }

@@ -39,8 +39,9 @@ class MediaItem {
 
 class ServiceItem {
   final String id;
+  final String? categoryId; // nullable for root-level services
   String name;
-  int price;
+  double price;
   List<String> tags;
   String description;
   List<MediaItem> media;
@@ -48,6 +49,7 @@ class ServiceItem {
 
   ServiceItem({
     required this.id,
+    this.categoryId,
     required this.name,
     required this.price,
     required this.tags,

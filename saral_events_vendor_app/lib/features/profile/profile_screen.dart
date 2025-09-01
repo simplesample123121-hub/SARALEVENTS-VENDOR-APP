@@ -9,37 +9,51 @@ class ProfileScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // Ensure latest vendor profile when arriving here
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (context.mounted) {
+        context.read<AppSession>().reloadVendorProfile();
+      }
+    });
+
     return Scaffold(
       appBar: AppBar(title: const Text('Profile')),
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
-                     CircleAvatar(
-             radius: 40,
-             backgroundColor: Colors.grey[100],
-             child: const SvgIcon(AppIcons.vendorSvg, size: 40, color: Colors.black),
-           ),
+          CircleAvatar(
+            radius: 40,
+            backgroundColor: Colors.grey[100],
+            child: const SvgIcon(AppIcons.vendorSvg, size: 40, color: Colors.black),
+          ),
           const SizedBox(height: 12),
           Center(
-            child: Text('Vendor Name', style: Theme.of(context).textTheme.titleMedium),
+            child: Text('Vendor', style: Theme.of(context).textTheme.titleMedium),
           ),
           const SizedBox(height: 24),
           ListTile(
             leading: const SvgIcon(AppIcons.businessDetailsSvg, size: 22, color: Colors.black),
             title: const Text('Business Details'),
             trailing: const Icon(Icons.chevron_right),
+            onTap: () {
+              context.push('/app/business-details');
+            },
           ),
           const Divider(),
           ListTile(
             leading: const SvgIcon(AppIcons.documentsSvg, size: 22, color: Colors.black),
             title: const Text('Documents'),
             trailing: const Icon(Icons.chevron_right),
+            onTap: () {
+              context.push('/app/documents');
+            },
           ),
           const Divider(),
           ListTile(
             leading: const SvgIcon(AppIcons.settingsSvg, size: 22, color: Colors.black),
             title: const Text('Settings'),
             trailing: const Icon(Icons.chevron_right),
+            onTap: () {},
           ),
           const SizedBox(height: 24),
           FilledButton(

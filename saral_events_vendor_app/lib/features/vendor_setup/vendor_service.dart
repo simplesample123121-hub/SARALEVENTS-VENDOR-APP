@@ -18,40 +18,60 @@ class VendorService {
           .from('vendor_profiles')
           .select()
           .eq('user_id', userId)
-          .single();
+          .maybeSingle();
 
       if (existingProfile != null) {
         // Update existing profile
         final updatedData = {
-          ...profile.toJson(),
+          'business_name': profile.businessName,
+          'address': profile.address,
+          'category': profile.category,
+          'phone_number': profile.phoneNumber,
+          'email': profile.email,
+          'website': profile.website,
+          'description': profile.description,
+          'services': profile.services,
           'updated_at': DateTime.now().toIso8601String(),
         };
         
-        final result = await _supabase
+        final resultList = await _supabase
             .from('vendor_profiles')
             .update(updatedData)
             .eq('user_id', userId)
-            .select()
-            .single();
-            
+            .select();
+        if (resultList.isEmpty) {
+          throw Exception('No profile updated');
+        }
+        final result = resultList.first;
         return VendorProfile.fromJson(result);
       } else {
         // Create new profile
         final newData = {
-          ...profile.toJson(),
+          'user_id': userId,
+          'business_name': profile.businessName,
+          'address': profile.address,
+          'category': profile.category,
+          'phone_number': profile.phoneNumber,
+          'email': profile.email,
+          'website': profile.website,
+          'description': profile.description,
+          'services': profile.services,
           'created_at': DateTime.now().toIso8601String(),
           'updated_at': DateTime.now().toIso8601String(),
         };
         
-        final result = await _supabase
+        final resultList = await _supabase
             .from('vendor_profiles')
             .insert(newData)
-            .select()
-            .single();
-            
+            .select();
+        if (resultList.isEmpty) {
+          throw Exception('No profile inserted');
+        }
+        final result = resultList.first;
         return VendorProfile.fromJson(result);
       }
     } catch (e) {
+      print('Error saving vendor profile: $e');
       throw Exception('Failed to save vendor profile: $e');
     }
   }
@@ -75,13 +95,18 @@ class VendorService {
   // Upload document file to Supabase storage
   Future<String> uploadDocument(File file, String documentType, String vendorId) async {
     try {
+      final userId = _supabase.auth.currentUser?.id;
+      if (userId == null) {
+        throw Exception('User not authenticated');
+      }
+
       final fileName = '${DateTime.now().millisecondsSinceEpoch}_${file.path.split('/').last}';
-      final filePath = 'vendor_documents/$vendorId/$documentType/$fileName';
+      final filePath = '$userId/$documentType/$fileName';
       
       // Upload file to storage
       await _supabase.storage
           .from('vendor_documents')
-          .upload(filePath, file);
+          .upload(filePath, file, fileOptions: const FileOptions(upsert: true));
 
       // Get public URL
       final fileUrl = _supabase.storage
@@ -98,12 +123,17 @@ class VendorService {
         uploadedAt: DateTime.now(),
       );
 
-      await _supabase
+      final inserted = await _supabase
           .from('vendor_documents')
-          .insert(document.toJson());
+          .insert(document.toJson())
+          .select()
+          .single();
+      
+      print('DB insert success for document: ${inserted['id']} ${inserted['document_type']}');
 
       return fileUrl;
     } catch (e) {
+      print('Error uploading document: $e');
       throw Exception('Failed to upload document: $e');
     }
   }
@@ -138,6 +168,70 @@ class VendorService {
           .eq('id', documentId);
     } catch (e) {
       throw Exception('Failed to delete document: $e');
+    }
+  }
+
+  // Backfill DB records from storage if files exist but DB rows are missing
+  Future<int> syncDocumentsFromStorage(String vendorId) async {
+    try {
+      final userId = _supabase.auth.currentUser?.id;
+      if (userId == null) return 0;
+
+      int insertedCount = 0;
+
+      // List top-level entries under the user's folder (these should be document type folders)
+      final topEntries = await _supabase.storage
+          .from('vendor_documents')
+          .list(path: userId);
+
+      for (final entry in topEntries) {
+        // Folders typically have null metadata; treat entry.name as documentType
+        final documentType = entry.name;
+
+        // List files inside the document type folder
+        final files = await _supabase.storage
+            .from('vendor_documents')
+            .list(path: '$userId/$documentType');
+
+        for (final f in files) {
+          // Skip if this is a subfolder (no metadata)
+          if (f.metadata == null) continue;
+          final path = '$userId/$documentType/${f.name}';
+          final fileName = f.name;
+
+          // Check if DB row exists
+          final existing = await _supabase
+              .from('vendor_documents')
+              .select('id')
+              .eq('vendor_id', vendorId)
+              .eq('file_path', path)
+              .maybeSingle();
+          if (existing != null) continue;
+
+          final fileUrl = _supabase.storage
+              .from('vendor_documents')
+              .getPublicUrl(path);
+
+          final doc = VendorDocument(
+            vendorId: vendorId,
+            documentType: documentType,
+            fileName: fileName,
+            filePath: path,
+            fileUrl: fileUrl,
+            uploadedAt: DateTime.now(),
+          );
+
+          await _supabase
+              .from('vendor_documents')
+              .insert(doc.toJson());
+          insertedCount += 1;
+        }
+      }
+
+      return insertedCount;
+    } catch (e) {
+      print('Error syncing documents from storage: $e');
+      return 0;
     }
   }
 

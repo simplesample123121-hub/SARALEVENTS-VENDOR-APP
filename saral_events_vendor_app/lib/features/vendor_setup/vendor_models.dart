@@ -1,5 +1,3 @@
-import 'dart:io';
-
 class VendorProfile {
   final String? id;
   final String userId;
@@ -30,6 +28,35 @@ class VendorProfile {
     required this.createdAt,
     required this.updatedAt,
   });
+
+  VendorProfile copyWith({
+    String? businessName,
+    String? address,
+    String? category,
+    String? phoneNumber,
+    String? email,
+    String? website,
+    String? description,
+    List<String>? services,
+    List<VendorDocument>? documents,
+    DateTime? updatedAt,
+  }) {
+    return VendorProfile(
+      id: id,
+      userId: userId,
+      businessName: businessName ?? this.businessName,
+      address: address ?? this.address,
+      category: category ?? this.category,
+      phoneNumber: phoneNumber ?? this.phoneNumber,
+      email: email ?? this.email,
+      website: website ?? this.website,
+      description: description ?? this.description,
+      services: services ?? this.services,
+      documents: documents ?? this.documents,
+      createdAt: createdAt,
+      updatedAt: updatedAt ?? DateTime.now(),
+    );
+  }
 
   Map<String, dynamic> toJson() {
     return {
@@ -87,8 +114,7 @@ class VendorDocument {
   });
 
   Map<String, dynamic> toJson() {
-    return {
-      'id': id,
+    final map = <String, dynamic>{
       'vendor_id': vendorId,
       'document_type': documentType,
       'file_name': fileName,
@@ -96,6 +122,10 @@ class VendorDocument {
       'file_url': fileUrl,
       'uploaded_at': uploadedAt.toIso8601String(),
     };
+    if (id != null) {
+      map['id'] = id;
+    }
+    return map;
   }
 
   factory VendorDocument.fromJson(Map<String, dynamic> json) {
