@@ -9,6 +9,7 @@ import '../../core/ui/app_icons.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'service_service.dart';
 
+
 class ServicesScreen extends StatefulWidget {
   const ServicesScreen({super.key});
 
@@ -24,6 +25,10 @@ class _ServicesScreenState extends State<ServicesScreen> with TickerProviderStat
   String _query = '';
   final TextEditingController _searchCtrl = TextEditingController();
   late final TabController _tabController;
+  // Multi-select state
+  bool _selectionMode = false;
+  final Set<String> _selectedServiceIds = <String>{};
+  final Set<String> _selectedCategoryIds = <String>{};
 
   CategoryNode get _current => _stack.isEmpty ? _root : _stack.last;
 
@@ -141,6 +146,241 @@ class _ServicesScreenState extends State<ServicesScreen> with TickerProviderStat
     }
   }
 
+  // Update cached service data across all tabs when a service status changes
+  void _updateCachedServiceStatus(String serviceId, bool newStatus) {
+    setState(() {
+      // Update in root services
+      for (final service in _root.services) {
+        if (service.id == serviceId) {
+          service.enabled = newStatus;
+          break;
+        }
+      }
+      
+      // Update in current category services
+      for (final service in _current.services) {
+        if (service.id == serviceId) {
+          service.enabled = newStatus;
+          break;
+        }
+      }
+      
+      // Update in all category services recursively
+      void updateCategoryServices(List<CategoryNode> categories) {
+        for (final category in categories) {
+          for (final service in category.services) {
+            if (service.id == serviceId) {
+              service.enabled = newStatus;
+              break;
+            }
+          }
+          updateCategoryServices(category.subcategories);
+        }
+      }
+      updateCategoryServices(_root.subcategories);
+    });
+  }
+
+  // Update cached service visibility across all tabs when visibility changes
+  void _updateCachedServiceVisibility(String serviceId, bool newVisibility) {
+    setState(() {
+      // Update in root services
+      for (final service in _root.services) {
+        if (service.id == serviceId) {
+          service.isVisibleToUsers = newVisibility;
+          break;
+        }
+      }
+      
+      // Update in current category services
+      for (final service in _current.services) {
+        if (service.id == serviceId) {
+          service.isVisibleToUsers = newVisibility;
+          break;
+        }
+      }
+      
+      // Update in all category services recursively
+      void updateCategoryServices(List<CategoryNode> categories) {
+        for (final category in categories) {
+          for (final service in category.services) {
+            if (service.id == serviceId) {
+              service.isVisibleToUsers = newVisibility;
+              break;
+            }
+          }
+          updateCategoryServices(category.subcategories);
+        }
+      }
+      updateCategoryServices(_root.subcategories);
+    });
+  }
+
+  // Selection helpers
+  void _startSelection(ServiceItem service) {
+    setState(() {
+      _selectionMode = true;
+      _selectedServiceIds.add(service.id);
+    });
+  }
+
+  void _toggleSelection(ServiceItem service) {
+    setState(() {
+      if (_selectedServiceIds.contains(service.id)) {
+        _selectedServiceIds.remove(service.id);
+      } else {
+        _selectedServiceIds.add(service.id);
+      }
+      if (_selectedServiceIds.isEmpty && _selectedCategoryIds.isEmpty) {
+        _selectionMode = false;
+      }
+    });
+  }
+
+  void _clearSelection() {
+    setState(() {
+      _selectionMode = false;
+      _selectedServiceIds.clear();
+      _selectedCategoryIds.clear();
+    });
+  }
+
+  void _startSelectionCategory(CategoryNode category) {
+    setState(() {
+      _selectionMode = true;
+      _selectedCategoryIds.add(category.id);
+    });
+  }
+
+  void _toggleSelectionCategory(CategoryNode category) {
+    setState(() {
+      if (_selectedCategoryIds.contains(category.id)) {
+        _selectedCategoryIds.remove(category.id);
+      } else {
+        _selectedCategoryIds.add(category.id);
+      }
+      if (_selectedServiceIds.isEmpty && _selectedCategoryIds.isEmpty) {
+        _selectionMode = false;
+      }
+    });
+  }
+
+  Future<void> _bulkDeleteSelected() async {
+    if (_selectedServiceIds.isEmpty && _selectedCategoryIds.isEmpty) return;
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Delete Services'),
+        content: Text('Delete ${_selectedServiceIds.length} service(s) and ${_selectedCategoryIds.length} categor${_selectedCategoryIds.length == 1 ? 'y' : 'ies'}?'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancel')),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, true),
+            style: FilledButton.styleFrom(backgroundColor: Colors.red),
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true) return;
+
+    int deletedServices = 0;
+    int deletedCategories = 0;
+    for (final id in List<String>.from(_selectedServiceIds)) {
+      final success = await _serviceService.deleteService(id);
+      if (success) {
+        deletedServices++;
+        setState(() {
+          _root.services.removeWhere((s) => s.id == id);
+          _current.services.removeWhere((s) => s.id == id);
+          void removeFromCategoryServices(List<CategoryNode> categories) {
+            for (final category in categories) {
+              category.services.removeWhere((s) => s.id == id);
+              removeFromCategoryServices(category.subcategories);
+            }
+          }
+          removeFromCategoryServices(_root.subcategories);
+        });
+        _selectedServiceIds.remove(id);
+      }
+    }
+    for (final id in List<String>.from(_selectedCategoryIds)) {
+      final success = await _serviceService.forceDeleteCategory(id);
+      if (success) {
+        deletedCategories++;
+        setState(() {
+          // Remove from current view's subcategories recursively
+          void removeCategoryById(List<CategoryNode> categories) {
+            categories.removeWhere((c) => c.id == id);
+            for (final c in categories) {
+              removeCategoryById(c.subcategories);
+            }
+          }
+          removeCategoryById(_root.subcategories);
+        });
+        _selectedCategoryIds.remove(id);
+      }
+    }
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Deleted $deletedServices service${deletedServices == 1 ? '' : 's'} and $deletedCategories categor${deletedCategories == 1 ? 'y' : 'ies'}')),
+      );
+    }
+    _clearSelection();
+  }
+
+  Future<void> _bulkMoveSelected() async {
+    if (_selectedServiceIds.isEmpty && _selectedCategoryIds.isEmpty) return;
+    final categories = await _serviceService.getCategories();
+    // Exclude any categories that are currently selected to move
+    final filteredCategories = categories
+        .where((cat) => !_selectedCategoryIds.contains(cat.id))
+        .toList();
+    String targetId = 'root';
+    final chosenId = await showDialog<String>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Move Services'),
+        content: DropdownButtonFormField<String>(
+          value: targetId,
+          items: [
+            const DropdownMenuItem(value: 'root', child: Text('Root (No Category)')),
+            ...filteredCategories.map((cat) => DropdownMenuItem(value: cat.id, child: Text(cat.name))),
+          ],
+          onChanged: (v) => targetId = v ?? targetId,
+          decoration: const InputDecoration(labelText: 'Select Category', border: OutlineInputBorder()),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
+          FilledButton(onPressed: () => Navigator.pop(context, targetId), child: const Text('Move')),
+        ],
+      ),
+    );
+    if (chosenId == null) return;
+
+    final newCategoryId = chosenId == 'root' ? null : chosenId;
+    int movedServices = 0;
+    int movedCategories = 0;
+    for (final id in List<String>.from(_selectedServiceIds)) {
+      final success = await _serviceService.updateService(id, {'category_id': newCategoryId});
+      if (success) movedServices++;
+    }
+    for (final catId in List<String>.from(_selectedCategoryIds)) {
+      if (chosenId == catId) {
+        continue; // avoid moving a category into itself
+      }
+      final success = await _serviceService.updateCategory(catId, {'parent_id': newCategoryId});
+      if (success) movedCategories++;
+    }
+    await _refreshData();
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Moved $movedServices service${movedServices == 1 ? '' : 's'} and $movedCategories categor${movedCategories == 1 ? 'y' : 'ies'}')),
+      );
+    }
+    _clearSelection();
+  }
+
   // Tab 1: All (file-explorer view)
   Widget _buildAllTab() {
     if (_isLoading) {
@@ -171,6 +411,10 @@ class _ServicesScreenState extends State<ServicesScreen> with TickerProviderStat
               subtitle: '${cat.subcategories.length} sub • ${cat.services.length} items',
               onTap: () => _selectCategoryChip(cat),
               onDelete: () => _deleteCategory(cat),
+              selectionMode: _selectionMode,
+              isSelected: _selectedCategoryIds.contains(cat.id),
+              onSelectedChanged: (_) => _toggleSelectionCategory(cat),
+              onLongPressSelect: () => _startSelectionCategory(cat),
             );
           }
           final item = visibleServices[index - visibleCats.length];
@@ -179,10 +423,14 @@ class _ServicesScreenState extends State<ServicesScreen> with TickerProviderStat
             onOpen: () => _openService(item),
             onDelete: () => _deleteService(item),
             onToggleEnabled: (v) async {
-              setState(() => item.enabled = v);
               await _serviceService.toggleServiceStatus(item.id, v);
+              _updateCachedServiceStatus(item.id, v);
             },
             onMove: () => _showMoveServiceDialog(item),
+            selectionMode: _selectionMode,
+            isSelected: _selectedServiceIds.contains(item.id),
+            onSelectedChanged: (_) => _toggleSelection(item),
+            onLongPressSelect: () => _startSelection(item),
           );
         },
       ),
@@ -232,8 +480,12 @@ class _ServicesScreenState extends State<ServicesScreen> with TickerProviderStat
                 onOpen: () => _openService(service),
                 onDelete: () => _deleteService(service),
                 onToggleEnabled: (v) async {
-                  setState(() => service.enabled = v);
                   await _serviceService.toggleServiceStatus(service.id, v);
+                  _updateCachedServiceStatus(service.id, v);
+                },
+                onToggleVisibility: (v) async {
+                  await _serviceService.toggleServiceVisibility(service.id, v);
+                  _updateCachedServiceVisibility(service.id, v);
                 },
               );
             },
@@ -320,8 +572,12 @@ class _ServicesScreenState extends State<ServicesScreen> with TickerProviderStat
                 onOpen: () => _openService(service),
                 onDelete: () => _deleteService(service),
                 onToggleEnabled: (v) async {
-                  setState(() => service.enabled = v);
                   await _serviceService.toggleServiceStatus(service.id, v);
+                  _updateCachedServiceStatus(service.id, v);
+                },
+                onToggleVisibility: (v) async {
+                  await _serviceService.toggleServiceVisibility(service.id, v);
+                  _updateCachedServiceVisibility(service.id, v);
                 },
               );
             },
@@ -353,7 +609,18 @@ class _ServicesScreenState extends State<ServicesScreen> with TickerProviderStat
         final success = await _serviceService.deleteService(item.id);
         if (success) {
           setState(() {
+            // Remove from current services
             _current.services.removeWhere((s) => s.id == item.id);
+            // Remove from root services
+            _root.services.removeWhere((s) => s.id == item.id);
+            // Remove from all category services recursively
+            void removeFromCategoryServices(List<CategoryNode> categories) {
+              for (final category in categories) {
+                category.services.removeWhere((s) => s.id == item.id);
+                removeFromCategoryServices(category.subcategories);
+              }
+            }
+            removeFromCategoryServices(_root.subcategories);
           });
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(content: Text('Service deleted successfully')),
@@ -546,12 +813,13 @@ class _ServicesScreenState extends State<ServicesScreen> with TickerProviderStat
   // Show dialog to move a service to a different category
   Future<void> _showMoveServiceDialog(ServiceItem service) async {
     final categories = await _serviceService.getCategories();
-    var currentCategory = categories.firstWhere(
-      (cat) => cat.id == service.categoryId,
-      orElse: () => CategoryNode(id: 'root', name: 'Root', subcategories: []),
-    );
+    String selectedCategoryId = service.categoryId ?? 'root';
+    // Ensure we do not list the currently selected categories (from multi-select) as destinations
+    final filteredCategories = categories
+        .where((cat) => !_selectedCategoryIds.contains(cat.id))
+        .toList();
 
-    final selectedCategory = await showDialog<CategoryNode>(
+    final chosenId = await showDialog<String>(
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('Move Service'),
@@ -560,19 +828,19 @@ class _ServicesScreenState extends State<ServicesScreen> with TickerProviderStat
           children: [
             Text('Move "${service.name}" to:'),
             const SizedBox(height: 16),
-            DropdownButtonFormField<CategoryNode>(
-              value: currentCategory,
+            DropdownButtonFormField<String>(
+              value: selectedCategoryId,
               items: [
-                DropdownMenuItem(
-                  value: CategoryNode(id: 'root', name: 'Root', subcategories: []),
-                  child: const Text('Root (No Category)'),
+                const DropdownMenuItem(
+                  value: 'root',
+                  child: Text('Root (No Category)'),
                 ),
-                ...categories.map((cat) => DropdownMenuItem(
-                  value: cat,
+                ...filteredCategories.map((cat) => DropdownMenuItem(
+                  value: cat.id,
                   child: Text(cat.name),
                 )),
               ],
-              onChanged: (value) => currentCategory = value ?? currentCategory,
+              onChanged: (value) => selectedCategoryId = value ?? selectedCategoryId,
               decoration: const InputDecoration(
                 labelText: 'Select Category',
                 border: OutlineInputBorder(),
@@ -586,22 +854,22 @@ class _ServicesScreenState extends State<ServicesScreen> with TickerProviderStat
             child: const Text('Cancel'),
           ),
           FilledButton(
-            onPressed: () => Navigator.pop(context, currentCategory),
+            onPressed: () => Navigator.pop(context, selectedCategoryId),
             child: const Text('Move'),
           ),
         ],
       ),
     );
 
-    if (selectedCategory != null) {
-      await _moveService(service, selectedCategory);
+    if (chosenId != null) {
+      await _moveService(service, chosenId);
     }
   }
 
   // Move service to a different category
-  Future<void> _moveService(ServiceItem service, CategoryNode targetCategory) async {
+  Future<void> _moveService(ServiceItem service, String targetCategoryId) async {
     try {
-      final newCategoryId = targetCategory.id == 'root' ? null : targetCategory.id;
+      final String? newCategoryId = targetCategoryId == 'root' ? null : targetCategoryId;
       final success = await _serviceService.updateService(service.id, {
         'category_id': newCategoryId,
       });
@@ -609,11 +877,11 @@ class _ServicesScreenState extends State<ServicesScreen> with TickerProviderStat
       if (success) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Service moved to ${targetCategory.name}'),
+            content: const Text('Service moved'),
           ),
         );
         
-        // Refresh the data to reflect changes
+        // Refresh the data to ensure consistency
         await _refreshData();
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -685,7 +953,14 @@ class _ServicesScreenState extends State<ServicesScreen> with TickerProviderStat
       ),
     );
     if (created != null) {
-      setState(() => _current.services.add(created));
+      setState(() {
+        // Add to current services
+        _current.services.add(created);
+        // Add to root services if it's a root-level service
+        if (created.categoryId == null) {
+          _root.services.add(created);
+        }
+      });
     }
   }
 
@@ -731,11 +1006,36 @@ class _ServicesScreenState extends State<ServicesScreen> with TickerProviderStat
       },
       child: Scaffold(
         appBar: AppBar(
-          title: Text(canPop ? _current.name : 'Catalog'),
+          title: Text(
+            _selectionMode
+                ? '${_selectedServiceIds.length + _selectedCategoryIds.length} selected'
+                : (canPop ? _current.name : 'Catalog'),
+            overflow: TextOverflow.ellipsis,
+          ),
           leading: canPop
               ? IconButton(icon: const Icon(Icons.arrow_back), onPressed: () => setState(() => _stack.removeLast()))
               : null,
-          actions: const [],
+          actions: _selectionMode
+              ? [
+                  IconButton(
+                    tooltip: 'Move',
+                    icon: const Icon(Icons.drive_file_move),
+                    onPressed: _bulkMoveSelected,
+                  ),
+                  IconButton(
+                    tooltip: 'Delete',
+                    icon: const Icon(Icons.delete_outline),
+                    onPressed: _bulkDeleteSelected,
+                  ),
+                  IconButton(
+                    tooltip: 'Cancel',
+                    icon: const Icon(Icons.close),
+                    onPressed: _clearSelection,
+                  ),
+                ]
+              : [
+
+                ],
           bottom: canPop ? null : TabBar(
             controller: _tabController,
             tabs: const [
@@ -806,7 +1106,11 @@ class _ServiceCard extends StatefulWidget {
   final VoidCallback onDelete;
   final ValueChanged<bool> onToggleEnabled;
   final VoidCallback? onMove;
-  const _ServiceCard({required this.item, required this.onOpen, required this.onDelete, required this.onToggleEnabled, this.onMove});
+  final bool selectionMode;
+  final bool isSelected;
+  final ValueChanged<bool?>? onSelectedChanged;
+  final VoidCallback? onLongPressSelect;
+  const _ServiceCard({required this.item, required this.onOpen, required this.onDelete, required this.onToggleEnabled, this.onMove, this.selectionMode = false, this.isSelected = false, this.onSelectedChanged, this.onLongPressSelect});
 
   @override
   State<_ServiceCard> createState() => _ServiceCardState();
@@ -834,6 +1138,13 @@ class _ServiceCardState extends State<_ServiceCard> {
             Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
+                if (widget.selectionMode) ...[
+                  Checkbox(
+                    value: widget.isSelected,
+                    onChanged: widget.onSelectedChanged,
+                  ),
+                  const SizedBox(width: 4),
+                ],
                 Container(
                   width: 64,
                   height: 64,
@@ -873,7 +1184,14 @@ class _ServiceCardState extends State<_ServiceCard> {
               ),
             const SizedBox(height: 8),
             GestureDetector(
-              onTap: () => setState(() => _expanded = !_expanded),
+              onTap: () {
+                if (widget.selectionMode) {
+                  widget.onSelectedChanged?.call(!widget.isSelected);
+                } else {
+                  setState(() => _expanded = !_expanded);
+                }
+              },
+              onLongPress: widget.onLongPressSelect,
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -918,33 +1236,45 @@ class _ServiceCardState extends State<_ServiceCard> {
                 ),
               ),
             const SizedBox(height: 8),
-            Row(
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              alignment: WrapAlignment.spaceBetween,
               children: [
-                IconButton(
-                  tooltip: 'Delete',
-                  onPressed: widget.onDelete,
-                  icon: const _TrashIcon(color: Colors.redAccent),
+                Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    IconButton(
+                      tooltip: 'Delete',
+                      onPressed: widget.onDelete,
+                      icon: const _TrashIcon(color: Colors.redAccent),
+                    ),
+                    if (widget.onMove != null) ...[
+                      IconButton(
+                        tooltip: 'Move Service',
+                        onPressed: widget.onMove,
+                        icon: const Icon(Icons.drag_handle, color: Colors.blue),
+                      ),
+                    ],
+                  ],
                 ),
-                if (widget.onMove != null) ...[
-                  IconButton(
-                    tooltip: 'Move Service',
-                    onPressed: widget.onMove,
-                    icon: const Icon(Icons.drag_handle, color: Colors.blue),
-                  ),
-                ],
-                const Spacer(),
-                TextButton(onPressed: widget.onOpen, child: const Text('Edit')),
-                TextButton(
-                  onPressed: () async {
-                    final link = 'https://example.com/service/${widget.item.id}';
-                    await Clipboard.setData(ClipboardData(text: link));
-                    if (mounted) {
-                      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Link copied to clipboard')));
-                    }
-                  },
-                  child: const Text('Share'),
+                Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    TextButton(onPressed: widget.onOpen, child: const Text('Edit')),
+                    TextButton(
+                      onPressed: () async {
+                        final link = 'https://example.com/service/${widget.item.id}';
+                        await Clipboard.setData(ClipboardData(text: link));
+                        if (mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Link copied to clipboard')));
+                        }
+                      },
+                      child: const Text('Share'),
+                    ),
+                    FilledButton.tonal(onPressed: widget.onOpen, child: const Text('Open')),
+                  ],
                 ),
-                FilledButton.tonal(onPressed: widget.onOpen, child: const Text('Open')),
               ],
             )
           ],
@@ -960,6 +1290,7 @@ class _ServiceCardWithCategory extends StatelessWidget {
   final VoidCallback onOpen;
   final VoidCallback onDelete;
   final ValueChanged<bool> onToggleEnabled;
+  final ValueChanged<bool>? onToggleVisibility;
   
   const _ServiceCardWithCategory({
     required this.item,
@@ -967,6 +1298,7 @@ class _ServiceCardWithCategory extends StatelessWidget {
     required this.onOpen,
     required this.onDelete,
     required this.onToggleEnabled,
+    this.onToggleVisibility,
   });
 
   @override
@@ -1023,9 +1355,34 @@ class _ServiceCardWithCategory extends StatelessWidget {
                     ],
                   ),
                 ),
-                Switch(
-                  value: item.enabled,
-                  onChanged: onToggleEnabled,
+                Column(
+                  children: [
+                    Switch(
+                      value: item.enabled,
+                      onChanged: onToggleEnabled,
+                    ),
+                    if (onToggleVisibility != null) ...[
+                      const SizedBox(height: 8),
+                      Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            item.isVisibleToUsers ? Icons.visibility : Icons.visibility_off,
+                            size: 16,
+                            color: item.isVisibleToUsers ? Colors.green : Colors.grey,
+                          ),
+                          const SizedBox(width: 4),
+                          Transform.scale(
+                            scale: 0.8,
+                            child: Switch(
+                              value: item.isVisibleToUsers,
+                              onChanged: onToggleVisibility,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ],
                 )
               ],
             ),
@@ -1046,16 +1403,28 @@ class _ServiceCardWithCategory extends StatelessWidget {
               style: Theme.of(context).textTheme.bodyMedium,
             ),
             const SizedBox(height: 8),
-            Row(
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              alignment: WrapAlignment.spaceBetween,
               children: [
-                IconButton(
-                  tooltip: 'Delete',
-                  onPressed: onDelete,
-                  icon: const _TrashIcon(color: Colors.redAccent),
+                Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    IconButton(
+                      tooltip: 'Delete',
+                      onPressed: onDelete,
+                      icon: const _TrashIcon(color: Colors.redAccent),
+                    ),
+                  ],
                 ),
-                const Spacer(),
-                TextButton(onPressed: onOpen, child: const Text('Edit')),
-                FilledButton.tonal(onPressed: onOpen, child: const Text('Open')),
+                Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    TextButton(onPressed: onOpen, child: const Text('Edit')),
+                    FilledButton.tonal(onPressed: onOpen, child: const Text('Open')),
+                  ],
+                ),
               ],
             )
           ],
@@ -1214,22 +1583,34 @@ class _FolderLikeCard extends StatelessWidget {
   final String subtitle;
   final VoidCallback onTap;
   final VoidCallback? onDelete;
-  final VoidCallback? onMove;
-  final bool isDraggable;
+  // onMove removed
+  final bool selectionMode;
+  final bool isSelected;
+  final ValueChanged<bool?>? onSelectedChanged;
+  final VoidCallback? onLongPressSelect;
   const _FolderLikeCard({
     required this.title, 
     required this.subtitle, 
     required this.onTap, 
     this.onDelete, 
-    this.onMove,
-    this.isDraggable = true,
+    this.selectionMode = false,
+    this.isSelected = false,
+    this.onSelectedChanged,
+    this.onLongPressSelect,
   });
 
   @override
   Widget build(BuildContext context) {
     Widget cardContent = InkWell(
       borderRadius: BorderRadius.circular(16),
-      onTap: onTap,
+      onTap: () {
+        if (selectionMode) {
+          onSelectedChanged?.call(!isSelected);
+        } else {
+          onTap();
+        }
+      },
+      onLongPress: onLongPressSelect,
       child: Card(
         elevation: 4,
         shadowColor: Colors.black12,
@@ -1243,6 +1624,10 @@ class _FolderLikeCard extends StatelessWidget {
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
+              if (selectionMode) ...[
+                Checkbox(value: isSelected, onChanged: onSelectedChanged),
+                const SizedBox(width: 4),
+              ],
               Container(
                 width: 64,
                 height: 64,
@@ -1257,13 +1642,13 @@ class _FolderLikeCard extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(title, style: const TextStyle(fontWeight: FontWeight.w600)),
+                    Text(title, style: const TextStyle(fontWeight: FontWeight.w600), overflow: TextOverflow.ellipsis),
                     const SizedBox(height: 4),
-                    Text(subtitle, style: const TextStyle(color: Colors.black54)),
+                    Text(subtitle, style: const TextStyle(color: Colors.black54), overflow: TextOverflow.ellipsis),
                   ],
                 ),
               ),
-              if (onDelete != null) ...[
+              if (onDelete != null && !selectionMode) ...[
                 IconButton(
                   tooltip: 'Delete Category',
                   onPressed: onDelete,
@@ -1271,57 +1656,13 @@ class _FolderLikeCard extends StatelessWidget {
                 ),
                 const SizedBox(width: 8),
               ],
-              if (onMove != null) ...[
-                IconButton(
-                  tooltip: 'Move Category',
-                  onPressed: onMove,
-                  icon: const Icon(Icons.drag_handle, color: Colors.blue),
-                ),
-                const SizedBox(width: 8),
-              ],
+              // Drag/move UI removed
               const Icon(Icons.chevron_right)
             ],
           ),
         ),
       ),
     );
-
-    if (isDraggable) {
-      return Draggable<CategoryNode>(
-        data: CategoryNode(id: title, name: title, subcategories: []), // We'll pass the actual category data
-        feedback: Material(
-          elevation: 8,
-          borderRadius: BorderRadius.circular(16),
-          child: Container(
-            width: 200,
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: Colors.blue.withValues(alpha: 0.9),
-              borderRadius: BorderRadius.circular(16),
-            ),
-            child: Row(
-              children: [
-                const Icon(Icons.folder, color: Colors.white),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: Text(
-                    title,
-                    style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600),
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
-        childWhenDragging: Opacity(
-          opacity: 0.5,
-          child: cardContent,
-        ),
-        child: cardContent,
-      );
-    }
-
     return cardContent;
   }
 }

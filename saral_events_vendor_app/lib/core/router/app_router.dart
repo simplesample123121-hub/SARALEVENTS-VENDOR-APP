@@ -23,13 +23,55 @@ class AppRouter {
           path: '/',
           redirect: (ctx, state) {
             final s = Provider.of<AppSession>(ctx, listen: false);
-            if (s.isPasswordRecovery) return '/auth/reset';
-            if (!s.isOnboardingComplete) return '/onboarding';
-            if (!s.isAuthenticated) return '/auth/pre';
-            if (!s.isVendorSetupComplete) return '/vendor/setup';
+            
+            // Wait for session to be initialized
+            if (!s.isInitialized) {
+              print('Router: Session not initialized yet, staying on root');
+              return null;
+            }
+            
+            print('Router: Session initialized, checking state...');
+            print('Router: isOnboardingComplete: ${s.isOnboardingComplete}');
+            print('Router: isAuthenticated: ${s.isAuthenticated}');
+            print('Router: isVendorSetupComplete: ${s.isVendorSetupComplete}');
+            
+            if (s.isPasswordRecovery) {
+              print('Router: Redirecting to password reset');
+              return '/auth/reset';
+            }
+            if (!s.isOnboardingComplete) {
+              print('Router: Redirecting to onboarding');
+              return '/onboarding';
+            }
+            if (!s.isAuthenticated) {
+              print('Router: Redirecting to auth pre');
+              return '/auth/pre';
+            }
+            if (!s.isVendorSetupComplete) {
+              print('Router: Redirecting to vendor setup');
+              return '/vendor/setup';
+            }
+            print('Router: Redirecting to app');
             return '/app';
           },
-          builder: (ctx, st) => const SizedBox.shrink(),
+          builder: (ctx, st) {
+            final s = Provider.of<AppSession>(ctx, listen: false);
+            if (!s.isInitialized) {
+              return const Scaffold(
+                body: Center(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      CircularProgressIndicator(),
+                      SizedBox(height: 16),
+                      Text('Loading...'),
+                    ],
+                  ),
+                ),
+              );
+            }
+            return const SizedBox.shrink();
+          },
         ),
         GoRoute(
           path: '/onboarding',

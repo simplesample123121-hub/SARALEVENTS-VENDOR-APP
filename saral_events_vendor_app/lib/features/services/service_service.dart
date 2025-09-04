@@ -201,7 +201,6 @@ class ServiceService {
           .from('services')
           .select()
           .eq('category_id', categoryId)
-          .eq('is_active', true)
           .order('created_at', ascending: false);
 
       return result.map((row) => ServiceItem(
@@ -313,6 +312,21 @@ class ServiceService {
     }
   }
 
+  // Toggle service visibility to users
+  Future<bool> toggleServiceVisibility(String serviceId, bool isVisible) async {
+    try {
+      await _supabase
+          .from('services')
+          .update({'is_visible_to_users': isVisible})
+          .eq('id', serviceId);
+
+      return true;
+    } catch (e) {
+      print('Error toggling service visibility: $e');
+      return false;
+    }
+  }
+
   // Get all services for current vendor
   Future<List<ServiceItem>> getAllServices() async {
     try {
@@ -337,6 +351,7 @@ class ServiceService {
                 ?.map((url) => MediaItem(url: url, type: MediaType.image))
                 .toList() ?? [],
         enabled: row['is_active'] ?? true, // Map the is_active field to enabled
+        isVisibleToUsers: row['is_visible_to_users'] ?? true,
       )).toList();
     } catch (e) {
       print('Error getting all services: $e');
@@ -367,6 +382,7 @@ class ServiceService {
                 ?.map((url) => MediaItem(url: url, type: MediaType.image))
                 .toList() ?? [],
         enabled: row['is_active'] ?? true, // Map the is_active field to enabled
+        isVisibleToUsers: row['is_visible_to_users'] ?? true,
       )).toList();
     } catch (e) {
       print('Error getting all services with status: $e');
@@ -385,7 +401,6 @@ class ServiceService {
           .select()
           .eq('vendor_id', vendorId)
           .filter('category_id', 'is', null)
-          .eq('is_active', true)
           .order('created_at', ascending: false);
 
       return result.map((row) => ServiceItem(
@@ -399,6 +414,7 @@ class ServiceService {
                 ?.map((url) => MediaItem(url: url, type: MediaType.image))
                 .toList() ?? [],
         enabled: row['is_active'] ?? true, // Map the is_active field to enabled
+        isVisibleToUsers: row['is_visible_to_users'] ?? true,
       )).toList();
     } catch (e) {
       print('Error getting root services: $e');

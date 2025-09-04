@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:google_sign_in/google_sign_in.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../../features/vendor_setup/vendor_service.dart';
 import '../../features/vendor_setup/vendor_models.dart';
 
@@ -9,13 +10,17 @@ class AppSession extends ChangeNotifier {
   bool _isAuthenticated = false;
   bool _isVendorSetupComplete = false;
   bool _isPasswordRecovery = false;
+  bool _isInitialized = false;
 
   VendorProfile? _vendorProfile;
   VendorProfile? get vendorProfile => _vendorProfile;
 
   AppSession() {
+    print('AppSession: Constructor called');
     Supabase.instance.client.auth.onAuthStateChange.listen((event) async {
+      print('AppSession: Auth state changed - ${event.event}');
       _isAuthenticated = event.session != null || Supabase.instance.client.auth.currentSession != null;
+      print('AppSession: Authentication status: $_isAuthenticated');
       if (event.event == AuthChangeEvent.passwordRecovery) {
         _isPasswordRecovery = true;
       }
@@ -27,20 +32,64 @@ class AppSession extends ChangeNotifier {
   }
 
   Future<void> _init() async {
-    await _checkVendorSetup();
-    notifyListeners();
+    print('AppSession: Starting initialization...');
+    try {
+      // Load onboarding completion status from SharedPreferences
+      await _loadOnboardingStatus();
+      
+      // Check if user is already authenticated (for app restarts)
+      final currentSession = Supabase.instance.client.auth.currentSession;
+      _isAuthenticated = currentSession != null;
+      print('AppSession: Initial auth check: $_isAuthenticated');
+      if (currentSession != null) {
+        print('AppSession: Current user: ${currentSession.user.email}');
+      }
+      
+      await _checkVendorSetup();
+      _isInitialized = true;
+      print('AppSession: Initialization complete');
+      notifyListeners();
+    } catch (e) {
+      print('AppSession: Error during initialization: $e');
+      _isInitialized = true;
+      notifyListeners();
+    }
+  }
+
+  Future<void> _loadOnboardingStatus() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      _isOnboardingComplete = prefs.getBool('isOnboardingComplete') ?? false;
+      print('AppSession: Loaded onboarding status: $_isOnboardingComplete');
+    } catch (e) {
+      print('AppSession: Error loading onboarding status: $e');
+      _isOnboardingComplete = false;
+    }
+  }
+
+  Future<void> _saveOnboardingStatus() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setBool('isOnboardingComplete', _isOnboardingComplete);
+      print('AppSession: Saved onboarding status: $_isOnboardingComplete');
+    } catch (e) {
+      print('AppSession: Error saving onboarding status: $e');
+    }
   }
 
   bool get isOnboardingComplete => _isOnboardingComplete;
   bool get isAuthenticated => _isAuthenticated;
   bool get isVendorSetupComplete => _isVendorSetupComplete;
   bool get isPasswordRecovery => _isPasswordRecovery;
+  bool get isInitialized => _isInitialized;
   
   // Add currentUser getter to access the authenticated user
   User? get currentUser => Supabase.instance.client.auth.currentUser;
 
   void completeOnboarding() {
+    print('AppSession: Completing onboarding');
     _isOnboardingComplete = true;
+    _saveOnboardingStatus(); // Save to SharedPreferences
     notifyListeners();
   }
 

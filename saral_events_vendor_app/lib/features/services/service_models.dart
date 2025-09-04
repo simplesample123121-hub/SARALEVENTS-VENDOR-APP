@@ -46,6 +46,7 @@ class ServiceItem {
   String description;
   List<MediaItem> media;
   bool enabled;
+  bool isVisibleToUsers;
 
   ServiceItem({
     required this.id,
@@ -56,6 +57,7 @@ class ServiceItem {
     required this.description,
     required this.media,
     this.enabled = true,
+    this.isVisibleToUsers = true,
   });
 }
 
