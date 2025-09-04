@@ -214,6 +214,60 @@ AND vendor_id = (
 RETURNING *;
 ```
 
+### **3.b Service Availability (Per-day overrides)**
+
+```sql
+-- Table for per-day, per-slot overrides. Default is available.
+create table if not exists service_availability (
+  service_id uuid references services(id) on delete cascade not null,
+  date date not null,
+  morning_available boolean not null default true,
+  afternoon_available boolean not null default true,
+  evening_available boolean not null default true,
+  night_available boolean not null default true,
+  custom_start text null,
+  custom_end text null,
+  inserted_at timestamptz default now(),
+  updated_at timestamptz default now(),
+  primary key (service_id, date)
+);
+
+alter table service_availability enable row level security;
+
+-- Vendors can manage availability for their own services
+create policy if not exists "vendors manage their service availability" on service_availability
+  for all using (
+    exists (
+      select 1 from services s
+      join vendor_profiles v on v.id = s.vendor_id
+      where s.id = service_availability.service_id and v.user_id = auth.uid()
+    )
+  ) with check (
+    exists (
+      select 1 from services s
+      join vendor_profiles v on v.id = s.vendor_id
+      where s.id = service_availability.service_id and v.user_id = auth.uid()
+    )
+  );
+
+-- Optional read policy for user app
+create policy if not exists "public read service availability" on service_availability
+  for select using (true);
+
+-- Maintain updated_at
+create or replace function update_timestamp() returns trigger as $$
+begin
+  new.updated_at = now();
+  return new;
+end;
+$$ language plpgsql;
+
+drop trigger if exists trg_update_service_availability on service_availability;
+create trigger trg_update_service_availability
+before update on service_availability
+for each row execute function update_timestamp();
+```
+
 ### **4. Document Management Queries**
 
 #### Get Documents by Type

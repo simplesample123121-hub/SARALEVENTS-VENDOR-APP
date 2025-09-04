@@ -8,6 +8,8 @@ import '../../core/ui/widgets.dart';
 import '../../core/ui/app_icons.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'service_service.dart';
+import 'availability_service.dart';
+import '../../widgets/availability_calendar.dart';
 
 
 class ServicesScreen extends StatefulWidget {
@@ -425,6 +427,13 @@ class _ServicesScreenState extends State<ServicesScreen> with TickerProviderStat
             onToggleEnabled: (v) async {
               await _serviceService.toggleServiceStatus(item.id, v);
               _updateCachedServiceStatus(item.id, v);
+            },
+            onOpenAvailability: () {
+              Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (_) => ServiceAvailabilityPage(item: item),
+                ),
+              );
             },
             onMove: () => _showMoveServiceDialog(item),
             selectionMode: _selectionMode,
@@ -1105,12 +1114,13 @@ class _ServiceCard extends StatefulWidget {
   final VoidCallback onOpen;
   final VoidCallback onDelete;
   final ValueChanged<bool> onToggleEnabled;
+  final VoidCallback? onOpenAvailability;
   final VoidCallback? onMove;
   final bool selectionMode;
   final bool isSelected;
   final ValueChanged<bool?>? onSelectedChanged;
   final VoidCallback? onLongPressSelect;
-  const _ServiceCard({required this.item, required this.onOpen, required this.onDelete, required this.onToggleEnabled, this.onMove, this.selectionMode = false, this.isSelected = false, this.onSelectedChanged, this.onLongPressSelect});
+  const _ServiceCard({required this.item, required this.onOpen, required this.onDelete, required this.onToggleEnabled, this.onOpenAvailability, this.onMove, this.selectionMode = false, this.isSelected = false, this.onSelectedChanged, this.onLongPressSelect});
 
   @override
   State<_ServiceCard> createState() => _ServiceCardState();
@@ -1262,6 +1272,8 @@ class _ServiceCardState extends State<_ServiceCard> {
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     TextButton(onPressed: widget.onOpen, child: const Text('Edit')),
+                    if (widget.onOpenAvailability != null)
+                      TextButton(onPressed: widget.onOpenAvailability, child: const Text('Availability')),
                     TextButton(
                       onPressed: () async {
                         final link = 'https://example.com/service/${widget.item.id}';
@@ -1540,6 +1552,51 @@ class ServiceDetailsPage extends StatelessWidget {
               ),
             const SizedBox(height: 12),
             Text(item.description),
+            const SizedBox(height: 24),
+            // Availability section for existing service
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(12),
+                boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 8, offset: const Offset(0, 2))],
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text('Availability', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
+                  const SizedBox(height: 8),
+                  AvailabilityCalendar(
+                    serviceId: item.id,
+                    availabilityService: AvailabilityService(),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class ServiceAvailabilityPage extends StatelessWidget {
+  final ServiceItem item;
+  const ServiceAvailabilityPage({super.key, required this.item});
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(title: const Text('Availability')),
+      body: SingleChildScrollView(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            AvailabilityCalendar(
+              serviceId: item.id,
+              availabilityService: AvailabilityService(),
+            ),
           ],
         ),
       ),
@@ -1781,8 +1838,15 @@ class _AddServicePageState extends State<_AddServicePage> {
       );
 
       if (service != null) {
-        // Navigate back with the created service
-        Navigator.pop(context, service);
+        // Navigate to availability configuration page after creation
+        if (mounted) {
+          await Navigator.of(context).push(
+            MaterialPageRoute(
+              builder: (_) => ServiceAvailabilityPage(item: service),
+            ),
+          );
+        }
+        if (mounted) Navigator.pop(context, service);
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
