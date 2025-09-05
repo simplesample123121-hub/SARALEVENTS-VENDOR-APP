@@ -27,6 +27,22 @@ class _HomeScreenState extends State<HomeScreen> {
       'name': 'Catering',
       'asset': 'assets/default_images/category_catering.jpg',
     },
+    {
+      'name': 'Venue',
+      'asset': 'assets/default_images/category_venue.jpg',
+    },
+    {
+      'name': 'Farmhouse',
+      'asset': 'assets/default_images/category_farmhouse.jpeg',
+    },
+    {
+      'name': 'Music/Dj',
+      'asset': 'assets/default_images/category_musicDj.jpg',
+    },
+    {
+      'name': 'Essentials',
+      'asset': 'assets/default_images/category_essentials.jpg',
+    },
   ];
 
   List<ServiceItem> _featuredServices = <ServiceItem>[];
