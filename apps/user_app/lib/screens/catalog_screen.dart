@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 import '../models/service_models.dart';
 import '../services/service_service.dart';
@@ -9,7 +8,9 @@ import 'booking_screen.dart';
 
 
 class CatalogScreen extends StatefulWidget {
-  const CatalogScreen({super.key});
+  final String? selectedCategory;
+  
+  const CatalogScreen({super.key, this.selectedCategory});
 
   @override
   State<CatalogScreen> createState() => _CatalogScreenState();
@@ -31,17 +32,30 @@ class _CatalogScreenState extends State<CatalogScreen> {
     super.initState();
     _serviceService = ServiceService(_supabase);
     _load();
+    
+    // If a category is pre-selected, set it
+    if (widget.selectedCategory != null) {
+      _selectedCategoryId = widget.selectedCategory;
+    }
   }
 
   Future<void> _load() async {
     setState(() { _isLoading = true; _error = null; });
     try {
       final categories = await _serviceService.getAllCategories();
-      final services = await _serviceService.getAllServices();
+      List<ServiceItem> services;
+      
+      // If a category is pre-selected, filter services by vendor category
+      if (widget.selectedCategory != null) {
+        services = await _loadServicesByVendorCategory(widget.selectedCategory!);
+        print('Loaded ${services.length} services for category: ${widget.selectedCategory}');
+      } else {
+        services = await _serviceService.getAllServices();
+        print('Loaded ${services.length} services');
+      }
       
       // Debug info
       print('Loaded ${categories.length} categories');
-      print('Loaded ${services.length} services');
       if (services.isNotEmpty) {
         print('Sample service vendors: ${services.take(3).map((s) => s.vendorName).join(', ')}');
       }
@@ -58,17 +72,76 @@ class _CatalogScreenState extends State<CatalogScreen> {
     }
   }
 
+  Future<List<ServiceItem>> _loadServicesByVendorCategory(String categoryName) async {
+    try {
+      print('Loading services for vendor category: $categoryName');
+      
+      // Fetch services from services table connected with vendor_profiles
+      final response = await _supabase
+          .from('services')
+          .select('''
+            id,
+            name,
+            description,
+            price,
+            vendor_id,
+            vendor_profiles!inner(
+              id,
+              business_name,
+              category
+            )
+          ''')
+          .eq('vendor_profiles.category', categoryName)
+          .limit(50);
+
+      print('Raw response: $response');
+      print('Response length: ${response.length}');
+
+      final services = response.map((data) {
+        print('Processing service data: $data');
+        final vendorData = data['vendor_profiles'] as Map<String, dynamic>;
+        print('Vendor data: $vendorData');
+        
+        return ServiceItem(
+          id: data['id'].toString(),
+          name: data['name'] ?? 'Unknown Service',
+          price: (data['price'] ?? 0.0).toDouble(),
+          description: data['description'] ?? 'Service from ${vendorData['business_name']}',
+          tags: [], // Empty tags for now
+          media: [], // Empty media for now
+          vendorId: data['vendor_id']?.toString() ?? '',
+          vendorName: vendorData['business_name'] ?? 'Unknown Vendor',
+        );
+      }).toList();
+
+      print('Processed services: ${services.length}');
+      return services;
+    } catch (e) {
+      print('Error fetching services from vendor profiles: $e');
+      print('Error details: ${e.toString()}');
+      return [];
+    }
+  }
+
   Future<void> _refresh() async {
-    if (_selectedCategoryId == null && _query.isEmpty) {
+    // If no category is selected and no search query, load all services
+    if (_selectedCategoryId == null && widget.selectedCategory == null && _query.isEmpty) {
       await _load();
       return;
     }
+    
     setState(() { _isLoading = true; });
     try {
       if (_query.isNotEmpty) {
+        // If there's a search query, search services
         final results = await _serviceService.searchServices(_query);
         setState(() { _services = results; });
+      } else if (widget.selectedCategory != null) {
+        // If a category was pre-selected from home page, reload services for that category
+        final results = await _loadServicesByVendorCategory(widget.selectedCategory!);
+        setState(() { _services = results; });
       } else if (_selectedCategoryId != null) {
+        // If a category was selected from the filter chips, get services for that category
         final results = await _serviceService.getServicesByCategory(_selectedCategoryId!);
         setState(() { _services = results; });
       }
@@ -79,9 +152,62 @@ class _CatalogScreenState extends State<CatalogScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return SafeArea(
+    return Scaffold(
+      body: SafeArea(
         child: Column(
           children: [
+            // Title section
+            if (widget.selectedCategory != null)
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(16),
+                margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFFDBB42).withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(
+                    color: const Color(0xFFFDBB42).withOpacity(0.3),
+                  ),
+                ),
+                child: Row(
+                  children: [
+                    Icon(
+                      _getCategoryIcon(widget.selectedCategory!),
+                      color: const Color(0xFFFDBB42),
+                      size: 24,
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            '${widget.selectedCategory} Services',
+                            style: const TextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.black87,
+                            ),
+                          ),
+                          Text(
+                            'Services from ${widget.selectedCategory} vendors',
+                            style: TextStyle(
+                              fontSize: 14,
+                              color: Colors.grey[600],
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    IconButton(
+                      onPressed: () => Navigator.of(context).pop(),
+                      icon: const Icon(Icons.close),
+                      color: Colors.grey[600],
+                    ),
+                  ],
+                ),
+              ),
+            
             // User profile section
             Consumer<UserSession>(
               builder: (context, session, _) {
@@ -150,38 +276,40 @@ class _CatalogScreenState extends State<CatalogScreen> {
                 },
               ),
             ),
-            SizedBox(
-              height: 48,
-              child: ListView.separated(
-                padding: const EdgeInsets.symmetric(horizontal: 12),
-                scrollDirection: Axis.horizontal,
-                itemBuilder: (context, index) {
-                  if (index == 0) {
-                    final isSelected = _selectedCategoryId == null;
+            // Only show category filter if no specific category is pre-selected
+            if (widget.selectedCategory == null)
+              SizedBox(
+                height: 48,
+                child: ListView.separated(
+                  padding: const EdgeInsets.symmetric(horizontal: 12),
+                  scrollDirection: Axis.horizontal,
+                  itemBuilder: (context, index) {
+                    if (index == 0) {
+                      final isSelected = _selectedCategoryId == null;
+                      return FilterChip(
+                        label: const Text('All'),
+                        selected: isSelected,
+                        onSelected: (_) async {
+                          setState(() { _selectedCategoryId = null; _query = ''; });
+                          await _load();
+                        },
+                      );
+                    }
+                    final cat = _categories[index - 1];
+                    final isSelected = _selectedCategoryId == cat.id;
                     return FilterChip(
-                      label: const Text('All'),
+                      label: Text(cat.name),
                       selected: isSelected,
                       onSelected: (_) async {
-                        setState(() { _selectedCategoryId = null; _query = ''; });
-                        await _load();
+                        setState(() { _selectedCategoryId = cat.id; _query = ''; });
+                        await _refresh();
                       },
                     );
-                  }
-                  final cat = _categories[index - 1];
-                  final isSelected = _selectedCategoryId == cat.id;
-                  return FilterChip(
-                    label: Text(cat.name),
-                    selected: isSelected,
-                    onSelected: (_) async {
-                      setState(() { _selectedCategoryId = cat.id; _query = ''; });
-                      await _refresh();
-                    },
-                  );
-                },
-                separatorBuilder: (_, __) => const SizedBox(width: 8),
-                itemCount: _categories.length + 1,
+                  },
+                  separatorBuilder: (_, __) => const SizedBox(width: 8),
+                  itemCount: _categories.length + 1,
+                ),
               ),
-            ),
             const SizedBox(height: 8),
             Expanded(
               child: _isLoading
@@ -222,12 +350,13 @@ class _CatalogScreenState extends State<CatalogScreen> {
                               separatorBuilder: (_, __) => const SizedBox(height: 16),
                               itemCount: _services.length,
                             ),
-                    ),
-                         ),
+                      ),
+            ),
            ],
          ),
-       );
-     }
+       ),
+     );
+   }
 
   Widget _buildServiceCard(BuildContext context, ServiceItem service) {
     return Container(
@@ -472,6 +601,18 @@ class _CatalogScreenState extends State<CatalogScreen> {
         ),
       ),
     );
+  }
+
+  IconData _getCategoryIcon(String categoryName) {
+    final name = categoryName.toLowerCase();
+    if (name.contains('photography')) return Icons.camera_alt;
+    if (name.contains('decoration')) return Icons.local_florist;
+    if (name.contains('catering')) return Icons.restaurant;
+    if (name.contains('farmhouse')) return Icons.home;
+    if (name.contains('music') || name.contains('dj')) return Icons.music_note;
+    if (name.contains('venue')) return Icons.location_on;
+    if (name.contains('event essentials')) return Icons.event;
+    return Icons.category;
   }
 
   IconData _getServiceIcon(String serviceName) {

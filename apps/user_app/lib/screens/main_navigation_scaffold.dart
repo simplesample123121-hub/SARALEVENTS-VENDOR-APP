@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 import '../core/session.dart';
-import 'catalog_screen.dart';
+import 'home_screen.dart';
 import 'orders_screen.dart';
 
 class MainNavigationScaffold extends StatefulWidget {
@@ -16,7 +16,7 @@ class _MainNavigationScaffoldState extends State<MainNavigationScaffold> {
   int _currentIndex = 0;
 
   final List<Widget> _tabs = const [
-    CatalogScreen(),
+    HomeScreen(),
     OrdersScreen(),
   ];
 
@@ -24,7 +24,7 @@ class _MainNavigationScaffoldState extends State<MainNavigationScaffold> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text(_currentIndex == 0 ? 'Services' : 'My Orders'),
+        title: Text(_currentIndex == 0 ? 'Home' : 'My Orders'),
         actions: [
           IconButton(
             icon: const Icon(Icons.logout),
@@ -69,9 +69,9 @@ class _MainNavigationScaffoldState extends State<MainNavigationScaffold> {
         unselectedItemColor: Colors.grey.shade600,
         items: const [
           BottomNavigationBarItem(
-            icon: Icon(Icons.explore),
-            activeIcon: Icon(Icons.explore, color: Color(0xFFFDBB42)), // Yellow color
-            label: 'Services',
+            icon: Icon(Icons.home),
+            activeIcon: Icon(Icons.home, color: Color(0xFFFDBB42)), // Yellow color
+            label: 'Home',
           ),
           BottomNavigationBarItem(
             icon: Icon(Icons.receipt_long),

@@ -429,9 +429,10 @@ class _ServicesScreenState extends State<ServicesScreen> with TickerProviderStat
               _updateCachedServiceStatus(item.id, v);
             },
             onOpenAvailability: () {
+              // Open service details with calendar in view mode; Edit available inside
               Navigator.of(context).push(
                 MaterialPageRoute(
-                  builder: (_) => ServiceAvailabilityPage(item: item),
+                  builder: (_) => ServiceDetailsPage(item: item),
                 ),
               );
             },
@@ -1500,28 +1501,35 @@ class _FabMenuState extends State<_FabMenu> with SingleTickerProviderStateMixin 
   }
 }
 
-class ServiceDetailsPage extends StatelessWidget {
+class ServiceDetailsPage extends StatefulWidget {
   final ServiceItem item;
   const ServiceDetailsPage({super.key, required this.item});
+
+  @override
+  State<ServiceDetailsPage> createState() => _ServiceDetailsPageState();
+}
+
+class _ServiceDetailsPageState extends State<ServiceDetailsPage> {
+  Key _calendarKey = UniqueKey();
 
   @override
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).textTheme;
     return Scaffold(
-      appBar: AppBar(title: Text(item.name)),
+      appBar: AppBar(title: Text(widget.item.name)),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(16),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            if (item.media.isNotEmpty)
+            if (widget.item.media.isNotEmpty)
               SizedBox(
                 height: 220,
                 child: PageView.builder(
-                  itemCount: item.media.length,
+                  itemCount: widget.item.media.length,
                   controller: PageController(viewportFraction: 0.9),
                   itemBuilder: (context, i) {
-                    final m = item.media[i];
+                    final m = widget.item.media[i];
                     return Padding(
                       padding: const EdgeInsets.only(right: 8.0),
                       child: ClipRRect(
@@ -1540,20 +1548,20 @@ class ServiceDetailsPage extends StatelessWidget {
                 ),
               ),
             const SizedBox(height: 16),
-            Text('₹${item.price}', style: textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w700)),
+            Text('₹${widget.item.price}', style: textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w700)),
             const SizedBox(height: 8),
-            Text('Status: ${item.enabled ? 'Enabled' : 'Disabled'}', style: textTheme.bodyMedium),
+            Text('Status: ${widget.item.enabled ? 'Enabled' : 'Disabled'}', style: textTheme.bodyMedium),
             const SizedBox(height: 8),
-            if (item.tags.isNotEmpty)
+            if (widget.item.tags.isNotEmpty)
               Wrap(
                 spacing: 6,
                 runSpacing: 6,
-                children: item.tags.map((t) => Chip(label: Text(t))).toList(),
+                children: widget.item.tags.map((t) => Chip(label: Text(t))).toList(),
               ),
             const SizedBox(height: 12),
-            Text(item.description),
+            Text(widget.item.description),
             const SizedBox(height: 24),
-            // Availability section for existing service
+            // Availability section for existing service (view mode with Edit)
             Container(
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
@@ -1564,11 +1572,30 @@ class ServiceDetailsPage extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Text('Availability', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      const Text('Availability', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
+                      TextButton.icon(
+                        onPressed: () async {
+                          final changed = await Navigator.of(context).push<bool>(
+                            MaterialPageRoute(builder: (_) => ServiceAvailabilityPage(item: widget.item)),
+                          );
+                          if (changed == true && mounted) {
+                            setState(() => _calendarKey = UniqueKey());
+                          }
+                        },
+                        icon: const Icon(Icons.edit, size: 18),
+                        label: const Text('Edit'),
+                      ),
+                    ],
+                  ),
                   const SizedBox(height: 8),
                   AvailabilityCalendar(
-                    serviceId: item.id,
+                    key: _calendarKey,
+                    serviceId: widget.item.id,
                     availabilityService: AvailabilityService(),
+                    isViewMode: true,
                   ),
                 ],
               ),
@@ -1586,8 +1613,24 @@ class ServiceAvailabilityPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final controller = AvailabilityCalendarController();
     return Scaffold(
-      appBar: AppBar(title: const Text('Availability')),
+      appBar: AppBar(
+        title: const Text('Availability'),
+        actions: [
+          TextButton(
+            onPressed: () async {
+              final overrides = controller.getOverrides();
+              final service = AvailabilityService();
+              for (final o in overrides) {
+                await service.upsertOverride(item.id, o);
+              }
+              if (context.mounted) Navigator.maybePop(context, true);
+            },
+            child: const Text('Save'),
+          )
+        ],
+      ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(16),
         child: Column(
@@ -1596,6 +1639,8 @@ class ServiceAvailabilityPage extends StatelessWidget {
             AvailabilityCalendar(
               serviceId: item.id,
               availabilityService: AvailabilityService(),
+              controller: controller,
+              persistImmediately: false, // buffer edits; Save button will persist
             ),
           ],
         ),
@@ -1745,6 +1790,7 @@ class _AddServicePageState extends State<_AddServicePage> {
   final List<MediaItem> _media = <MediaItem>[];
   bool _enabled = true;
   bool _isSaving = false;
+  final AvailabilityCalendarController _availabilityController = AvailabilityCalendarController();
 
   void _addTagFromInput() {
     final raw = _tagCtrl.text.trim();
@@ -1838,8 +1884,16 @@ class _AddServicePageState extends State<_AddServicePage> {
       );
 
       if (service != null) {
-        // Navigate to availability configuration page after creation
-        if (mounted) {
+        // Persist any availability overrides captured during creation
+        final overrides = _availabilityController.getOverrides();
+        if (overrides.isNotEmpty) {
+          final availabilityService = AvailabilityService();
+          for (final o in overrides) {
+            await availabilityService.upsertOverride(service.id, o);
+          }
+        }
+        // Optional: allow further fine-tuning after create
+        if (mounted && overrides.isEmpty) {
           await Navigator.of(context).push(
             MaterialPageRoute(
               builder: (_) => ServiceAvailabilityPage(item: service),
@@ -2002,6 +2056,27 @@ class _AddServicePageState extends State<_AddServicePage> {
                     );
                   },
                 ),
+              const SizedBox(height: 16),
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(12),
+                  boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 8, offset: const Offset(0, 2))],
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text('Availability', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
+                    const SizedBox(height: 8),
+                    AvailabilityCalendar(
+                      serviceId: null, // create flow
+                      availabilityService: AvailabilityService(),
+                      controller: _availabilityController,
+                    ),
+                  ],
+                ),
+              ),
             ],
           ),
         ),

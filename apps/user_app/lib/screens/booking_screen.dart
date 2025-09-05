@@ -2,6 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../models/service_models.dart';
 import '../services/booking_service.dart';
+import '../widgets/user_availability_calendar.dart';
+import '../widgets/time_slot_picker.dart';
+import '../services/availability_service.dart';
 
 class BookingScreen extends StatefulWidget {
   final ServiceItem service;
@@ -14,15 +17,27 @@ class BookingScreen extends StatefulWidget {
 
 class _BookingScreenState extends State<BookingScreen> {
   late final BookingService _bookingService;
-  DateTime _selectedDate = DateTime.now();
+  late final AvailabilityService _availabilityService;
+  DateTime? _selectedDate;
   TimeOfDay? _selectedTime;
   final TextEditingController _notesController = TextEditingController();
   bool _isLoading = false;
+  List<TimeSlot> _availableTimeSlots = [];
+  TimeSlot? _selectedTimeSlot;
 
   @override
   void initState() {
     super.initState();
     _bookingService = BookingService(Supabase.instance.client);
+    _availabilityService = AvailabilityService(Supabase.instance.client);
+    
+    // Debug: Print service information
+    print('=== BOOKING SCREEN DEBUG ===');
+    print('Service Name: ${widget.service.name}');
+    print('Service ID: ${widget.service.id}');
+    print('Vendor ID: ${widget.service.vendorId}');
+    print('Service Price: ${widget.service.price}');
+    print('============================');
   }
 
   @override
@@ -31,51 +46,58 @@ class _BookingScreenState extends State<BookingScreen> {
     super.dispose();
   }
 
-  Future<void> _selectDate() async {
-    final DateTime? picked = await showDatePicker(
-      context: context,
-      initialDate: _selectedDate,
-      firstDate: DateTime.now(),
-      lastDate: DateTime.now().add(const Duration(days: 365)),
-      builder: (context, child) {
-        return Theme(
-          data: Theme.of(context).copyWith(
-            colorScheme: Theme.of(context).colorScheme.copyWith(
-              primary: const Color(0xFFFDBB42),
-            ),
+  void _onDateSelected(DateTime date, TimeOfDay? time) {
+    setState(() {
+      _selectedDate = date;
+      _selectedTime = time;
+      _selectedTimeSlot = null;
+      _availableTimeSlots = [];
+    });
+    
+    // Load available time slots for the selected date
+    _loadTimeSlotsForDate(date);
+  }
+
+  void _onTimeSlotSelected(TimeSlot slot) {
+    setState(() {
+      _selectedTimeSlot = slot;
+      _selectedTime = slot.startTime;
+    });
+  }
+
+  Future<void> _loadTimeSlotsForDate(DateTime date) async {
+    try {
+      final timeSlotsData = await _availabilityService.getAvailableTimeSlots(widget.service.id, date);
+      
+      final slots = timeSlotsData.map((slotData) {
+        final startTimeParts = slotData['start_time'].split(':');
+        final endTimeParts = slotData['end_time'].split(':');
+        
+        return TimeSlot(
+          startTime: TimeOfDay(
+            hour: int.parse(startTimeParts[0]),
+            minute: int.parse(startTimeParts[1]),
           ),
-          child: child!,
+          endTime: TimeOfDay(
+            hour: int.parse(endTimeParts[0]),
+            minute: int.parse(endTimeParts[1]),
+          ),
+          isAvailable: slotData['is_available'] as bool,
         );
-      },
-    );
-    if (picked != null && picked != _selectedDate) {
+      }).toList();
+      
       setState(() {
-        _selectedDate = picked;
+        _availableTimeSlots = slots;
+      });
+    } catch (e) {
+      print('Error loading time slots: $e');
+      setState(() {
+        _availableTimeSlots = [];
       });
     }
   }
 
-  Future<void> _selectTime() async {
-    final TimeOfDay? picked = await showTimePicker(
-      context: context,
-      initialTime: _selectedTime ?? TimeOfDay.now(),
-      builder: (context, child) {
-        return Theme(
-          data: Theme.of(context).copyWith(
-            colorScheme: Theme.of(context).colorScheme.copyWith(
-              primary: const Color(0xFFFDBB42),
-            ),
-          ),
-          child: child!,
-        );
-      },
-    );
-    if (picked != null && picked != _selectedTime) {
-      setState(() {
-        _selectedTime = picked;
-      });
-    }
-  }
+
 
   Future<void> _createBooking() async {
     print('Creating booking for service: ${widget.service.name}');
@@ -97,6 +119,13 @@ class _BookingScreenState extends State<BookingScreen> {
       return;
     }
 
+    if (_selectedDate == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please select a date for your booking')),
+      );
+      return;
+    }
+
     setState(() {
       _isLoading = true;
     });
@@ -105,7 +134,7 @@ class _BookingScreenState extends State<BookingScreen> {
       final success = await _bookingService.createBooking(
         serviceId: widget.service.id,
         vendorId: widget.service.vendorId,
-        bookingDate: _selectedDate,
+        bookingDate: _selectedDate!,
         bookingTime: _selectedTime,
         amount: widget.service.price,
         notes: _notesController.text.trim().isNotEmpty ? _notesController.text.trim() : null,
@@ -218,17 +247,19 @@ class _BookingScreenState extends State<BookingScreen> {
             _buildServiceCard(),
             const SizedBox(height: 24),
 
-            // Date Selection
-            _buildSectionTitle('Select Date', Icons.calendar_today),
+            // Availability Calendar
+            _buildSectionTitle('Select Date & Time', Icons.calendar_today),
             const SizedBox(height: 12),
-            _buildDateSelector(),
+            _buildAvailabilityCalendar(),
             const SizedBox(height: 24),
 
-            // Time Selection
-            _buildSectionTitle('Select Time (Optional)', Icons.access_time),
-            const SizedBox(height: 12),
-            _buildTimeSelector(),
-            const SizedBox(height: 24),
+            // Time Slots (if date is selected)
+            if (_selectedDate != null && _availableTimeSlots.isNotEmpty) ...[
+              _buildSectionTitle('Available Time Slots', Icons.access_time),
+              const SizedBox(height: 12),
+              _buildTimeSlotPicker(),
+              const SizedBox(height: 24),
+            ],
 
             // Notes
             _buildSectionTitle('Additional Notes', Icons.note),
@@ -401,11 +432,11 @@ class _BookingScreenState extends State<BookingScreen> {
     );
   }
 
-  Widget _buildDateSelector() {
+  Widget _buildAvailabilityCalendar() {
     return Container(
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(15),
         boxShadow: [
           BoxShadow(
             color: Colors.black.withOpacity(0.05),
@@ -414,65 +445,24 @@ class _BookingScreenState extends State<BookingScreen> {
           ),
         ],
       ),
-      child: InkWell(
-        onTap: _selectDate,
-        borderRadius: BorderRadius.circular(16),
-        child: Padding(
-          padding: const EdgeInsets.all(20),
-          child: Row(
-            children: [
-              Container(
-                padding: const EdgeInsets.all(10),
-                decoration: BoxDecoration(
-                  color: const Color(0xFFFDBB42).withOpacity(0.1),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: const Icon(
-                  Icons.calendar_today,
-                  color: Color(0xFFFDBB42),
-                  size: 24,
-                ),
-              ),
-              const SizedBox(width: 16),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      '${_selectedDate.day}/${_selectedDate.month}/${_selectedDate.year}',
-                      style: const TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w600,
-                        color: Colors.black87,
-                      ),
-                    ),
-                    Text(
-                      _getDayName(_selectedDate),
-                      style: TextStyle(
-                        fontSize: 14,
-                        color: Colors.grey[600],
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              Icon(
-                Icons.arrow_forward_ios,
-                color: Colors.grey[400],
-                size: 16,
-              ),
-            ],
-          ),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: UserAvailabilityCalendar(
+          serviceId: widget.service.id,
+          vendorId: widget.service.vendorId,
+          onDateSelected: _onDateSelected,
+          selectedDate: _selectedDate,
+          selectedTime: _selectedTime,
         ),
       ),
     );
   }
 
-  Widget _buildTimeSelector() {
+  Widget _buildTimeSlotPicker() {
     return Container(
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(15),
         boxShadow: [
           BoxShadow(
             color: Colors.black.withOpacity(0.05),
@@ -481,61 +471,17 @@ class _BookingScreenState extends State<BookingScreen> {
           ),
         ],
       ),
-      child: InkWell(
-        onTap: _selectTime,
-        borderRadius: BorderRadius.circular(16),
-        child: Padding(
-          padding: const EdgeInsets.all(20),
-          child: Row(
-            children: [
-              Container(
-                padding: const EdgeInsets.all(10),
-                decoration: BoxDecoration(
-                  color: const Color(0xFFFDBB42).withOpacity(0.1),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: const Icon(
-                  Icons.access_time,
-                  color: Color(0xFFFDBB42),
-                  size: 24,
-                ),
-              ),
-              const SizedBox(width: 16),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      _selectedTime != null 
-                          ? '${_selectedTime!.hour.toString().padLeft(2, '0')}:${_selectedTime!.minute.toString().padLeft(2, '0')}'
-                          : 'Select time',
-                      style: TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w600,
-                        color: _selectedTime != null ? Colors.black87 : Colors.grey[500],
-                      ),
-                    ),
-                    Text(
-                      _selectedTime != null ? 'Time selected' : 'Optional',
-                      style: TextStyle(
-                        fontSize: 14,
-                        color: Colors.grey[600],
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              Icon(
-                Icons.arrow_forward_ios,
-                color: Colors.grey[400],
-                size: 16,
-              ),
-            ],
-          ),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: TimeSlotPicker(
+          availableSlots: _availableTimeSlots,
+          selectedSlot: _selectedTimeSlot,
+          onSlotSelected: _onTimeSlotSelected,
         ),
       ),
     );
   }
+
 
   Widget _buildNotesField() {
     return Container(
@@ -631,7 +577,7 @@ class _BookingScreenState extends State<BookingScreen> {
                 const SizedBox(height: 20),
                 _buildSummaryRow('Service', widget.service.name),
                 _buildSummaryRow('Vendor', widget.service.vendorName),
-                _buildSummaryRow('Date', '${_selectedDate.day}/${_selectedDate.month}/${_selectedDate.year}'),
+                _buildSummaryRow('Date', _selectedDate != null ? '${_selectedDate!.day}/${_selectedDate!.month}/${_selectedDate!.year}' : 'Not selected'),
                 if (_selectedTime != null)
                   _buildSummaryRow('Time', '${_selectedTime!.hour.toString().padLeft(2, '0')}:${_selectedTime!.minute.toString().padLeft(2, '0')}'),
                 const Divider(height: 32),
@@ -783,8 +729,4 @@ class _BookingScreenState extends State<BookingScreen> {
     }
   }
 
-  String _getDayName(DateTime date) {
-    const days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
-    return days[date.weekday - 1];
-  }
 }
