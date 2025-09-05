@@ -13,15 +13,20 @@ class HomeScreen extends StatefulWidget {
 
 class _HomeScreenState extends State<HomeScreen> {
 
-  // Static categories as requested
-  final List<String> _staticCategories = [
-    'Photography',
-    'Decoration', 
-    'Catering',
-    'Farmhouse',
-    'Music DJ',
-    'Venue',
-    'Event essentials'
+  // Static categories with asset mapping to match the provided UI
+  final List<Map<String, String>> _categories = [
+    {
+      'name': 'Photography',
+      'asset': 'assets/default_images/category_photoghraphy.jpg',
+    },
+    {
+      'name': 'Decoration',
+      'asset': 'assets/default_images/category_decoration.jpg',
+    },
+    {
+      'name': 'Catering',
+      'asset': 'assets/default_images/category_catering.jpg',
+    },
   ];
 
   List<ServiceItem> _featuredServices = <ServiceItem>[];
@@ -376,16 +381,18 @@ class _HomeScreenState extends State<HomeScreen> {
               const Text(
                 'Categories',
                 style: TextStyle(
-                  fontSize: 20,
-                  fontWeight: FontWeight.bold,
+                  fontSize: 28,
+                  fontWeight: FontWeight.w800,
                   color: Colors.black87,
+                  letterSpacing: 0.2,
                 ),
               ),
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
                 decoration: BoxDecoration(
-                  color: Colors.grey[100],
-                  borderRadius: BorderRadius.circular(8),
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(14),
+                  border: Border.all(color: Colors.black.withOpacity(0.1)),
                 ),
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
@@ -393,16 +400,16 @@ class _HomeScreenState extends State<HomeScreen> {
                     const Text(
                       'See All',
                       style: TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w500,
+                        fontSize: 16,
+                        fontWeight: FontWeight.w600,
                         color: Colors.black87,
                       ),
                     ),
-                    const SizedBox(width: 4),
-                    Icon(
-                      Icons.arrow_forward_ios,
-                      size: 12,
-                      color: Colors.grey[600],
+                    const SizedBox(width: 6),
+                    const Icon(
+                      Icons.north_east,
+                      size: 18,
+                      color: Colors.black87,
                     ),
                   ],
                 ),
@@ -423,14 +430,14 @@ class _HomeScreenState extends State<HomeScreen> {
         ),
         const SizedBox(height: 16),
         SizedBox(
-          height: 120,
+          height: 190,
           child: ListView.builder(
             scrollDirection: Axis.horizontal,
             padding: const EdgeInsets.symmetric(horizontal: 20),
-            itemCount: _staticCategories.length,
+            itemCount: _categories.length,
             itemBuilder: (context, index) {
-              final categoryName = _staticCategories[index];
-              return _buildCategoryCard(categoryName);
+              final item = _categories[index];
+              return _buildImageCategoryCard(item['name']!, item['asset']!);
             },
           ),
         ),
@@ -438,42 +445,37 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  Widget _buildCategoryCard(String categoryName) {
+  Widget _buildImageCategoryCard(String categoryName, String assetPath) {
     return GestureDetector(
       onTap: () => _onCategoryTapped(categoryName),
       child: Container(
-        width: 100,
-        margin: const EdgeInsets.only(right: 16),
+        width: 220,
+        margin: const EdgeInsets.only(right: 18),
         child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Container(
-              width: 80,
-              height: 80,
-              decoration: BoxDecoration(
-                color: Colors.grey[100],
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(
-                  color: Colors.grey[300]!,
-                  width: 1,
+            ClipRRect(
+              borderRadius: BorderRadius.circular(16),
+              child: AspectRatio(
+                aspectRatio: 16 / 10,
+                child: Image.asset(
+                  assetPath,
+                  fit: BoxFit.cover,
                 ),
               ),
-              child: Icon(
-                _getCategoryIcon(categoryName),
-                size: 32,
-                color: const Color(0xFFFDBB42),
-              ),
             ),
-            const SizedBox(height: 8),
-            Text(
-              categoryName,
-              style: const TextStyle(
-                fontSize: 12,
-                fontWeight: FontWeight.w500,
-                color: Colors.black87,
+            const SizedBox(height: 10),
+            Align(
+              alignment: Alignment.centerLeft,
+              child: Text(
+                categoryName,
+                textAlign: TextAlign.start,
+                style: const TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.w600,
+                  color: Colors.black87,
+                ),
               ),
-              textAlign: TextAlign.center,
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
             ),
           ],
         ),
@@ -652,18 +654,6 @@ class _HomeScreenState extends State<HomeScreen> {
         ],
       ),
     );
-  }
-
-  IconData _getCategoryIcon(String categoryName) {
-    final name = categoryName.toLowerCase();
-    if (name.contains('photography')) return Icons.camera_alt;
-    if (name.contains('decoration')) return Icons.local_florist;
-    if (name.contains('catering')) return Icons.restaurant;
-    if (name.contains('farmhouse')) return Icons.home;
-    if (name.contains('music') || name.contains('dj')) return Icons.music_note;
-    if (name.contains('venue')) return Icons.location_on;
-    if (name.contains('event essentials')) return Icons.event;
-    return Icons.category;
   }
 
   IconData _getServiceIcon(String serviceName) {
