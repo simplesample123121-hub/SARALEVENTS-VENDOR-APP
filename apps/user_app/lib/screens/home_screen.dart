@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../core/session.dart';
+import '../core/ui/image_utils.dart';
 import '../models/service_models.dart';
 import 'catalog_screen.dart';
 
@@ -53,6 +54,13 @@ class _HomeScreenState extends State<HomeScreen> {
   void initState() {
     super.initState();
     _loadData();
+    // Precache category images to avoid flicker on first horizontal scroll
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      AppImages.precacheAssets(
+        context,
+        _categories.map((c) => c['asset']!).toList(),
+      );
+    });
   }
 
   Future<void> _loadData() async {
@@ -303,84 +311,17 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Widget _buildHeroBanner() {
-    return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 20),
-      height: 200,
-      decoration: BoxDecoration(
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 20),
+      child: ClipRRect(
         borderRadius: BorderRadius.circular(16),
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [
-            const Color(0xFFFDBB42).withOpacity(0.8),
-            const Color(0xFFFDBB42).withOpacity(0.6),
-          ],
+        child: AspectRatio(
+          aspectRatio: 16 / 9,
+          child: Image.asset(
+            'assets/onboarding/onboarding_1.png',
+            fit: BoxFit.cover,
+          ),
         ),
-      ),
-      child: Stack(
-        children: [
-          // Background pattern
-          Positioned.fill(
-            child: Container(
-              decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(16),
-                image: const DecorationImage(
-                  image: AssetImage('assets/images/henna_pattern.png'), // You'll need to add this asset
-                  fit: BoxFit.cover,
-                  opacity: 0.3,
-                ),
-              ),
-            ),
-          ),
-          
-          // Content
-          Padding(
-            padding: const EdgeInsets.all(20),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                const Text(
-                  'Step into a world of celebrations',
-                  style: TextStyle(
-                    fontSize: 24,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.white,
-                  ),
-                ),
-                const SizedBox(height: 8),
-                const Text(
-                  'Find the perfect services for your special moments',
-                  style: TextStyle(
-                    fontSize: 16,
-                    color: Colors.white70,
-                  ),
-                ),
-                const SizedBox(height: 16),
-                ElevatedButton(
-                  onPressed: () {
-                    Navigator.of(context).push(
-                      MaterialPageRoute(
-                        builder: (context) => const CatalogScreen(),
-                      ),
-                    );
-                  },
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.white,
-                    foregroundColor: const Color(0xFFFDBB42),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                  ),
-                  child: const Text(
-                    'Explore Services',
-                    style: TextStyle(fontWeight: FontWeight.w600),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
       ),
     );
   }
@@ -433,23 +374,13 @@ class _HomeScreenState extends State<HomeScreen> {
             ],
           ),
         ),
-        const SizedBox(height: 8),
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 20),
-          child: Text(
-            'Step into a world of celebrations',
-            style: TextStyle(
-              fontSize: 14,
-              color: Colors.grey[600],
-            ),
-          ),
-        ),
         const SizedBox(height: 16),
         SizedBox(
           height: 190,
           child: ListView.builder(
             scrollDirection: Axis.horizontal,
             padding: const EdgeInsets.symmetric(horizontal: 20),
+            cacheExtent: 1200, // keep multiple items decoded in cache
             itemCount: _categories.length,
             itemBuilder: (context, index) {
               final item = _categories[index];
@@ -474,10 +405,14 @@ class _HomeScreenState extends State<HomeScreen> {
               borderRadius: BorderRadius.circular(16),
               child: AspectRatio(
                 aspectRatio: 16 / 10,
-                child: Image.asset(
-                  assetPath,
-                  fit: BoxFit.cover,
-                ),
+                child: Builder(builder: (context) {
+                  return AppImages.asset(
+                    assetPath,
+                    targetLogicalWidth: 220,
+                    aspectRatio: 16 / 10,
+                    fit: BoxFit.cover,
+                  );
+                }),
               ),
             ),
             const SizedBox(height: 10),

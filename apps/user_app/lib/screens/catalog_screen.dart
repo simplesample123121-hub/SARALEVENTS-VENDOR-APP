@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:provider/provider.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 import '../models/service_models.dart';
 import '../services/service_service.dart';
 import '../core/session.dart';
 import 'booking_screen.dart';
+import '../core/cache/simple_cache.dart';
 
 
 class CatalogScreen extends StatefulWidget {
@@ -75,24 +77,30 @@ class _CatalogScreenState extends State<CatalogScreen> {
   Future<List<ServiceItem>> _loadServicesByVendorCategory(String categoryName) async {
     try {
       print('Loading services for vendor category: $categoryName');
-      
-      // Fetch services from services table connected with vendor_profiles
-      final response = await _supabase
-          .from('services')
-          .select('''
-            id,
-            name,
-            description,
-            price,
-            vendor_id,
-            vendor_profiles!inner(
-              id,
-              business_name,
-              category
-            )
-          ''')
-          .eq('vendor_profiles.category', categoryName)
-          .limit(50);
+      final cacheKey = 'services:vendorCategory:${categoryName.toLowerCase()}';
+      final response = await CacheManager.instance.getOrFetch<List<dynamic>>(
+        cacheKey,
+        const Duration(minutes: 5),
+        () async {
+          return await _supabase
+              .from('services')
+              .select('''
+                id,
+                name,
+                description,
+                price,
+                media_urls,
+                vendor_id,
+                vendor_profiles!inner(
+                  id,
+                  business_name,
+                  category
+                )
+              ''')
+              .eq('vendor_profiles.category', categoryName)
+              .limit(50);
+        },
+      );
 
       print('Raw response: $response');
       print('Response length: ${response.length}');
@@ -107,8 +115,11 @@ class _CatalogScreenState extends State<CatalogScreen> {
           name: data['name'] ?? 'Unknown Service',
           price: (data['price'] ?? 0.0).toDouble(),
           description: data['description'] ?? 'Service from ${vendorData['business_name']}',
-          tags: [], // Empty tags for now
-          media: [], // Empty media for now
+          tags: [],
+          media: (data['media_urls'] as List<dynamic>?)
+                  ?.map((url) => MediaItem(url: url, type: MediaType.image))
+                  .toList() ??
+              [],
           vendorId: data['vendor_id']?.toString() ?? '',
           vendorName: vendorData['business_name'] ?? 'Unknown Vendor',
         );
@@ -388,41 +399,62 @@ class _CatalogScreenState extends State<CatalogScreen> {
                   topLeft: Radius.circular(20),
                   topRight: Radius.circular(20),
                 ),
-                gradient: LinearGradient(
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                  colors: [
-                    const Color(0xFFFDBB42).withOpacity(0.1),
-                    const Color(0xFFFDBB42).withOpacity(0.05),
-                  ],
-                ),
               ),
               child: Stack(
+                fit: StackFit.expand,
                 children: [
-                  // Service Icon
-                  Center(
-                    child: Container(
-                      width: 80,
-                      height: 80,
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFFDBB42),
-                        borderRadius: BorderRadius.circular(20),
-                        boxShadow: [
-                          BoxShadow(
-                            color: const Color(0xFFFDBB42).withOpacity(0.3),
-                            blurRadius: 15,
-                            offset: const Offset(0, 5),
-                          ),
-                        ],
+                  if (service.media.isNotEmpty)
+                    ClipRRect(
+                      borderRadius: const BorderRadius.only(
+                        topLeft: Radius.circular(20),
+                        topRight: Radius.circular(20),
                       ),
-                      child: Icon(
-                        _getServiceIcon(service.name),
-                        size: 40,
-                        color: Colors.white,
+                      child: CachedNetworkImage(
+                        imageUrl: service.media.first.url,
+                        fit: BoxFit.cover,
+                        placeholder: (context, url) => Container(color: const Color(0xFFFDBB42).withOpacity(0.08)),
+                        errorWidget: (context, url, error) => Container(color: const Color(0xFFFDBB42).withOpacity(0.08)),
+                      ),
+                    )
+                  else
+                    Container(
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                          colors: [
+                            const Color(0xFFFDBB42).withOpacity(0.1),
+                            const Color(0xFFFDBB42).withOpacity(0.05),
+                          ],
+                        ),
+                        borderRadius: const BorderRadius.only(
+                          topLeft: Radius.circular(20),
+                          topRight: Radius.circular(20),
+                        ),
+                      ),
+                      child: Center(
+                        child: Container(
+                          width: 80,
+                          height: 80,
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFFDBB42),
+                            borderRadius: BorderRadius.circular(20),
+                            boxShadow: [
+                              BoxShadow(
+                                color: const Color(0xFFFDBB42).withOpacity(0.3),
+                                blurRadius: 15,
+                                offset: const Offset(0, 5),
+                              ),
+                            ],
+                          ),
+                          child: Icon(
+                            _getServiceIcon(service.name),
+                            size: 40,
+                            color: Colors.white,
+                          ),
+                        ),
                       ),
                     ),
-                  ),
-                  // Price Badge
                   Positioned(
                     top: 16,
                     right: 16,

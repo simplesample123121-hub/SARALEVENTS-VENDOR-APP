@@ -1,4 +1,5 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
+import '../core/cache/simple_cache.dart';
 
 class AvailabilityService {
   final SupabaseClient _supabase;
@@ -9,17 +10,25 @@ class AvailabilityService {
     try {
       final startOfMonth = DateTime(month.year, month.month, 1);
       final endOfMonth = DateTime(month.year, month.month + 1, 0);
+      final cacheKey = 'availability:$serviceId:${startOfMonth.year}-${startOfMonth.month.toString().padLeft(2, '0')}';
 
-      final response = await _supabase
-          .from('service_availability')
-          .select('*')
-          .eq('service_id', serviceId)
-          .gte('date', startOfMonth.toIso8601String())
-          .lte('date', endOfMonth.toIso8601String());
+      final data = await CacheManager.instance.getOrFetch<List<dynamic>>(
+        cacheKey,
+        const Duration(minutes: 2),
+        () async {
+          final response = await _supabase
+              .from('service_availability')
+              .select('*')
+              .eq('service_id', serviceId)
+              .gte('date', startOfMonth.toIso8601String())
+              .lte('date', endOfMonth.toIso8601String());
+          return response;
+        },
+      );
 
       return {
         'success': true,
-        'data': response,
+        'data': data,
       };
     } catch (e) {
       print('Error fetching availability: $e');
@@ -32,11 +41,19 @@ class AvailabilityService {
 
   Future<List<Map<String, dynamic>>> getAvailableTimeSlots(String serviceId, DateTime date) async {
     try {
-      final response = await _supabase
-          .from('service_availability')
-          .select('*')
-          .eq('service_id', serviceId)
-          .eq('date', date.toIso8601String().split('T')[0]);
+      final key = 'timeslots:$serviceId:${date.toIso8601String().split('T')[0]}';
+      final response = await CacheManager.instance.getOrFetch<List<dynamic>>(
+        key,
+        const Duration(minutes: 1),
+        () async {
+          final res = await _supabase
+              .from('service_availability')
+              .select('*')
+              .eq('service_id', serviceId)
+              .eq('date', date.toIso8601String().split('T')[0]);
+          return res;
+        },
+      );
 
       if (response.isEmpty) {
         return [];

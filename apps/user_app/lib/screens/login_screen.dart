@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
-// import 'package:flutter_svg/flutter_svg.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 import '../core/session.dart';
 
 class LoginScreen extends StatefulWidget {
@@ -132,53 +132,52 @@ class _LoginScreenState extends State<LoginScreen> {
                           child: _isLoading ? const CircularProgressIndicator() : const Text('Login'),
                         ),
                       ),
-                      // Google Sign-In temporarily disabled
-                      // const SizedBox(height: 12),
-                      // Row(
-                      //   children: const [
-                      //     Expanded(child: Divider()),
-                      //     Padding(
-                      //       padding: EdgeInsets.symmetric(horizontal: 8.0),
-                      //       child: Text('or continue with'),
-                      //     ),
-                      //     Expanded(child: Divider()),
-                      //   ],
-                      // ),
-                      // const SizedBox(height: 12),
-                      // SizedBox(
-                      //   width: double.infinity,
-                      //   child: OutlinedButton(
-                      //     style: OutlinedButton.styleFrom(
-                      //       backgroundColor: Colors.white,
-                      //       foregroundColor: Colors.black87,
-                      //       side: const BorderSide(color: Colors.black26, width: 1.2),
-                      //       padding: const EdgeInsets.symmetric(vertical: 14),
-                      //       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-                      //     ),
-                      //     onPressed: () async {
-                      //       setState(() => _isLoading = true);
-                      //       try {
-                      //         await context.read<UserSession>().signInWithGoogleNative();
-                      //         if (!mounted) return;
-                      //         context.go('/');
-                      //       } catch (e) {
-                      //         if (mounted) {
-                      //           ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Google sign-in failed: $e')));
-                      //         }
-                      //       } finally {
-                      //         if (mounted) setState(() => _isLoading = false);
-                      //       }
-                      //     },
-                      //     child: Row(
-                      //       mainAxisAlignment: MainAxisAlignment.center,
-                      //       children: [
-                      //         SvgPicture.asset('assets/icons/google_logo.svg', width: 18, height: 18),
-                      //         const SizedBox(width: 8),
-                      //         const Text('Continue with Google'),
-                      //       ],
-                      //     ),
-                      //   ),
-                      // ),
+                      const SizedBox(height: 12),
+                      Row(
+                        children: const [
+                          Expanded(child: Divider()),
+                          Padding(
+                            padding: EdgeInsets.symmetric(horizontal: 8.0),
+                            child: Text('or continue with'),
+                          ),
+                          Expanded(child: Divider()),
+                        ],
+                      ),
+                      const SizedBox(height: 12),
+                      SizedBox(
+                        width: double.infinity,
+                        child: OutlinedButton(
+                          style: OutlinedButton.styleFrom(
+                            backgroundColor: Colors.white,
+                            foregroundColor: Colors.black87,
+                            side: const BorderSide(color: Colors.black26, width: 1.2),
+                            padding: const EdgeInsets.symmetric(vertical: 14),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                          ),
+                          onPressed: () async {
+                            setState(() => _isLoading = true);
+                            try {
+                              await context.read<UserSession>().signInWithGoogleNative();
+                              if (!mounted) return;
+                              context.go('/');
+                            } catch (e) {
+                              if (mounted) {
+                                ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Google sign-in failed: $e')));
+                              }
+                            } finally {
+                              if (mounted) setState(() => _isLoading = false);
+                            }
+                          },
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              SvgPicture.asset('assets/icons/google_logo.svg', width: 18, height: 18),
+                              const SizedBox(width: 8),
+                              const Text('Continue with Google'),
+                            ],
+                          ),
+                        ),
+                      ),
                       const SizedBox(height: 8),
                       Align(
                         alignment: Alignment.centerRight,

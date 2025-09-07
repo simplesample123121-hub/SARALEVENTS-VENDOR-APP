@@ -1,6 +1,6 @@
 import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-// import 'package:google_sign_in/google_sign_in.dart';
+import 'package:google_sign_in/google_sign_in.dart';
 
 class UserSession extends ChangeNotifier {
   bool _isOnboardingComplete = false;
@@ -92,43 +92,42 @@ class UserSession extends ChangeNotifier {
     }
   }
 
-  // Google Sign-In temporarily disabled
-  // Future<void> signInWithGoogleNative() async {
-  //   try {
-  //     const serverClientId = '314736791162-8pq9o3hr42ibap3oesifibeotdamgdj2.apps.googleusercontent.com';
+  Future<void> signInWithGoogleNative() async {
+		try {
+			const serverClientId = '314736791162-8pq9o3hr42ibap3oesifibeotdamgdj2.apps.googleusercontent.com';
 
-  //     final signIn = GoogleSignIn(
-  //       serverClientId: serverClientId,
-  //       scopes: const ['email', 'profile'],
-  //     );
+			final signIn = GoogleSignIn(
+				serverClientId: serverClientId,
+				scopes: const ['email', 'profile'],
+			);
 
-  //     await signIn.signOut();
-  //     final account = await signIn.signIn();
-  //     if (account == null) {
-  //       throw Exception('Sign-in cancelled');
-  //     }
+			await signIn.signOut();
+			final account = await signIn.signIn();
+			if (account == null) {
+				throw Exception('Sign-in cancelled');
+			}
 
-  //     final auth = await account.authentication;
-  //     final idToken = auth.idToken;
-  //     if (idToken == null) {
-  //       throw Exception('No Google ID token received');
-  //     }
+			final auth = await account.authentication;
+			final idToken = auth.idToken;
+			if (idToken == null) {
+				throw Exception('No Google ID token received');
+			}
 
-  //     final res = await Supabase.instance.client.auth.signInWithIdToken(
-  //       provider: OAuthProvider.google,
-  //       idToken: idToken,
-  //     );
+			final res = await Supabase.instance.client.auth.signInWithIdToken(
+				provider: OAuthProvider.google,
+				idToken: idToken,
+			);
 
-  //     _isAuthenticated = res.session != null || Supabase.instance.client.auth.currentSession != null;
-  //     if (_isAuthenticated) {
-  //       await _checkUserRole();
-  //     }
-  //     notifyListeners();
-  //   } catch (e) {
-  //     print('Google Sign-In error: $e');
-  //     rethrow;
-  //   }
-  // }
+			_isAuthenticated = res.session != null || Supabase.instance.client.auth.currentSession != null;
+			if (_isAuthenticated) {
+				await _checkUserRole();
+			}
+			notifyListeners();
+		} catch (e) {
+			print('Google Sign-In error: $e');
+			rethrow;
+		}
+	}
 
   Future<bool> registerWithEmail(String email, String password, {
     required String firstName,

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
+import '../core/ui/image_utils.dart';
 
 class PreAuthScreen extends StatelessWidget {
   const PreAuthScreen({super.key});
@@ -127,7 +128,11 @@ class _RoundedImage extends StatelessWidget {
       child: SizedBox(
         height: height,
         width: double.infinity,
-        child: Image.asset(asset, fit: BoxFit.cover),
+        child: AppImages.asset(
+          asset,
+          targetLogicalWidth: MediaQuery.of(context).size.width,
+          fit: BoxFit.cover,
+        ),
       ),
     );
   }

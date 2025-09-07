@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 import '../core/session.dart';
+import '../core/ui/image_utils.dart';
 
 class OnboardingScreen extends StatefulWidget {
   const OnboardingScreen({super.key});
@@ -16,6 +17,14 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
 
   @override
   Widget build(BuildContext context) {
+    // Precache onboarding assets once
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      AppImages.precacheAssets(context, const [
+        'assets/onboarding/onboarding_1.png',
+        'assets/onboarding/onboarding_2.png',
+        'assets/onboarding/onboarding_3.png',
+      ]);
+    });
     final pages = [
       _OnboardPage(
         title: 'Find Amazing Services',
@@ -135,11 +144,10 @@ class _OnboardPage extends StatelessWidget {
                 bottomLeft: Radius.circular(30),
                 bottomRight: Radius.circular(30),
               ),
-              child: Image.asset(
+              child: AppImages.asset(
                 imagePath,
+                targetLogicalWidth: MediaQuery.of(context).size.width,
                 fit: BoxFit.cover,
-                width: double.infinity,
-                height: double.infinity,
               ),
             ),
           ),

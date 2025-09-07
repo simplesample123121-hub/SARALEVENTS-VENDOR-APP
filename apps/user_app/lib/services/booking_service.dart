@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../models/service_models.dart';
+import '../core/cache/simple_cache.dart';
 
 class BookingService {
   final SupabaseClient _supabase;
@@ -78,6 +79,10 @@ class BookingService {
       final result = await _supabase.from('bookings').insert(bookingData).select();
       print('Booking created successfully: $result');
 
+      // Invalidate caches impacted by booking
+      CacheManager.instance.invalidateByPrefix('availability:$serviceId');
+      CacheManager.instance.invalidate('user:bookings');
+
       return true;
     } catch (e) {
       print('Error creating booking: $e');
@@ -91,11 +96,15 @@ class BookingService {
     try {
       final userId = _supabase.auth.currentUser?.id;
       if (userId == null) return [];
-
-      final result = await _supabase
-          .rpc('get_user_bookings', params: {'user_uuid': userId});
-
-      return List<Map<String, dynamic>>.from(result);
+      return await CacheManager.instance.getOrFetch<List<Map<String, dynamic>>>(
+        'user:bookings',
+        const Duration(minutes: 1),
+        () async {
+          final result = await _supabase
+              .rpc('get_user_bookings', params: {'user_uuid': userId});
+          return List<Map<String, dynamic>>.from(result);
+        },
+      );
     } catch (e) {
       print('Error fetching user bookings: $e');
       return [];
@@ -116,6 +125,9 @@ class BookingService {
           })
           .eq('id', bookingId)
           .eq('user_id', userId);
+
+      // Invalidate related caches
+      CacheManager.instance.invalidate('user:bookings');
 
       return true;
     } catch (e) {
@@ -146,10 +158,16 @@ class BookingService {
       final userId = _supabase.auth.currentUser?.id;
       if (userId == null) return {};
 
-      final result = await _supabase
-          .from('bookings')
-          .select('status')
-          .eq('user_id', userId);
+      final result = await CacheManager.instance.getOrFetch<List<dynamic>>(
+        'user:booking-stats',
+        const Duration(minutes: 1),
+        () async {
+          return await _supabase
+              .from('bookings')
+              .select('status')
+              .eq('user_id', userId);
+        },
+      );
 
       final stats = <String, int>{};
       for (final booking in result) {
