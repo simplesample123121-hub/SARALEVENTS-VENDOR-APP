@@ -45,6 +45,14 @@ class ServiceService {
               enabled: row['is_active'] ?? true,
               vendorId: vendorId,
               vendorName: vendorName,
+              capacityMin: row['capacity_min'] as int?,
+              capacityMax: row['capacity_max'] as int?,
+              parkingSpaces: row['parking_spaces'] as int?,
+              ratingAvg: (row['rating_avg'] is num) ? (row['rating_avg'] as num).toDouble() : null,
+              ratingCount: row['rating_count'] as int?,
+              suitedFor: List<String>.from(row['suited_for'] ?? const <String>[]),
+              features: (row['features'] as Map<String, dynamic>?) ?? const <String, dynamic>{},
+              policies: List<String>.from(row['policies'] ?? const <String>[]),
             );
           }).toList();
         },
@@ -117,6 +125,14 @@ class ServiceService {
               enabled: row['is_active'] ?? true,
               vendorId: vendorProfile['id'] ?? '',
               vendorName: vendorProfile['business_name'] ?? 'Unknown Vendor',
+              capacityMin: row['capacity_min'] as int?,
+              capacityMax: row['capacity_max'] as int?,
+              parkingSpaces: row['parking_spaces'] as int?,
+              ratingAvg: (row['rating_avg'] is num) ? (row['rating_avg'] as num).toDouble() : null,
+              ratingCount: row['rating_count'] as int?,
+              suitedFor: List<String>.from(row['suited_for'] ?? const <String>[]),
+              features: (row['features'] as Map<String, dynamic>?) ?? const <String, dynamic>{},
+              policies: List<String>.from(row['policies'] ?? const <String>[]),
             );
           }).toList();
         },
@@ -165,6 +181,14 @@ class ServiceService {
               enabled: row['is_active'] ?? true,
               vendorId: vendorProfile['id'] ?? '',
               vendorName: vendorProfile['business_name'] ?? 'Unknown Vendor',
+              capacityMin: row['capacity_min'] as int?,
+              capacityMax: row['capacity_max'] as int?,
+              parkingSpaces: row['parking_spaces'] as int?,
+              ratingAvg: (row['rating_avg'] is num) ? (row['rating_avg'] as num).toDouble() : null,
+              ratingCount: row['rating_count'] as int?,
+              suitedFor: List<String>.from(row['suited_for'] ?? const <String>[]),
+              features: (row['features'] as Map<String, dynamic>?) ?? const <String, dynamic>{},
+              policies: List<String>.from(row['policies'] ?? const <String>[]),
             );
           }).toList();
         },

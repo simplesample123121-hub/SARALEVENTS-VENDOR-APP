@@ -1,0 +1,48 @@
+{
+    // Use IntelliSense to learn about possible attributes.
+    // Hover to view descriptions of existing attributes.
+    // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "saral_events_vendor_app",
+            "cwd": "saral_events_vendor_app",
+            "request": "launch",
+            "type": "dart"
+        },
+        {
+            "name": "saral_events_vendor_app (profile mode)",
+            "cwd": "saral_events_vendor_app",
+            "request": "launch",
+            "type": "dart",
+            "flutterMode": "profile"
+        },
+        {
+            "name": "saral_events_vendor_app (release mode)",
+            "cwd": "saral_events_vendor_app",
+            "request": "launch",
+            "type": "dart",
+            "flutterMode": "release"
+        },
+        {
+            "name": "user_app",
+            "cwd": "apps\\user_app",
+            "request": "launch",
+            "type": "dart"
+        },
+        {
+            "name": "user_app (profile mode)",
+            "cwd": "apps\\user_app",
+            "request": "launch",
+            "type": "dart",
+            "flutterMode": "profile"
+        },
+        {
+            "name": "user_app (release mode)",
+            "cwd": "apps\\user_app",
+            "request": "launch",
+            "type": "dart",
+            "flutterMode": "release"
+        }
+    ]
+}

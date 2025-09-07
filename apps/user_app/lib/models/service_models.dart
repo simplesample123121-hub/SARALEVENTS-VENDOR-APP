@@ -18,6 +18,14 @@ class ServiceItem {
   final bool enabled;
   final String vendorId; // Add vendor ID for user app
   final String vendorName; // Add vendor name for user app
+  final int? capacityMin;
+  final int? capacityMax;
+  final int? parkingSpaces;
+  final double? ratingAvg;
+  final int? ratingCount;
+  final List<String> suitedFor;
+  final Map<String, dynamic> features;
+  final List<String> policies;
 
   const ServiceItem({
     required this.id,
@@ -30,6 +38,14 @@ class ServiceItem {
     this.enabled = true,
     required this.vendorId,
     required this.vendorName,
+    this.capacityMin,
+    this.capacityMax,
+    this.parkingSpaces,
+    this.ratingAvg,
+    this.ratingCount,
+    this.suitedFor = const <String>[],
+    this.features = const <String, dynamic>{},
+    this.policies = const <String>[],
   });
 }
 

@@ -70,6 +70,23 @@ class ServiceService {
     }
   }
 
+  // Get vendor category (e.g., Photography, Decoration) from vendor_profiles
+  Future<String?> _getVendorCategory() async {
+    try {
+      final vendorId = await _getVendorId();
+      if (vendorId == null) return null;
+      final result = await _supabase
+          .from('vendor_profiles')
+          .select('category')
+          .eq('id', vendorId)
+          .maybeSingle();
+      return result?['category'] as String?;
+    } catch (e) {
+      print('Error getting vendor category: $e');
+      return null;
+    }
+  }
+
   // Create new category
   Future<CategoryNode?> createCategory(String name, String? parentId) async {
     try {
@@ -229,23 +246,42 @@ class ServiceService {
     required List<String> tags,
     required String description,
     required List<String> mediaUrls,
+    int? capacityMin,
+    int? capacityMax,
+    int? parkingSpaces,
+    List<String>? suitedFor,
+    Map<String, dynamic>? features,
+    List<String>? policies,
+    bool isActive = true,
   }) async {
     try {
       final vendorId = await _getVendorId();
       if (vendorId == null) return null;
+      // Auto-populate the top-level vendor category label into services.category
+      final vendorCategory = await _getVendorCategory();
+
+      final insert = {
+        'vendor_id': vendorId,
+        'category_id': categoryId, // nullable for root-level service
+        'name': name,
+        'price': price,
+        'tags': tags,
+        'description': description,
+        'media_urls': mediaUrls,
+        'is_active': isActive,
+        'category': vendorCategory,
+        'capacity_min': capacityMin,
+        'capacity_max': capacityMax,
+        'parking_spaces': parkingSpaces,
+        'suited_for': (suitedFor == null || suitedFor.isEmpty) ? null : suitedFor,
+        'features': (features == null || features.isEmpty) ? null : features,
+        'policies': (policies == null || policies.isEmpty) ? null : policies,
+      };
+      insert.removeWhere((k, v) => v == null);
 
       final result = await _supabase
           .from('services')
-          .insert({
-            'vendor_id': vendorId,
-            'category_id': categoryId, // nullable for root-level service
-            'name': name,
-            'price': price,
-            'tags': tags,
-            'description': description,
-            'media_urls': mediaUrls,
-            'is_active': true,
-          })
+          .insert(insert)
           .select()
           .single();
 

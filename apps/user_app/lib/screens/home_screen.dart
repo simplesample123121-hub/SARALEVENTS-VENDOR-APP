@@ -4,6 +4,8 @@ import '../core/session.dart';
 import '../core/ui/image_utils.dart';
 import '../models/service_models.dart';
 import 'catalog_screen.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
+import '../services/profile_service.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -49,6 +51,10 @@ class _HomeScreenState extends State<HomeScreen> {
   List<ServiceItem> _featuredServices = <ServiceItem>[];
   bool _isLoading = true;
   String? _error;
+  String? _displayName;
+  VoidCallback? _sessionListener;
+  UserSession? _sessionRef;
+  String? _avatarUrl;
 
   @override
   void initState() {
@@ -60,6 +66,37 @@ class _HomeScreenState extends State<HomeScreen> {
         context,
         _categories.map((c) => c['asset']!).toList(),
       );
+      _attachSessionListenerAndLoadName();
+    });
+  }
+
+  void _attachSessionListenerAndLoadName() {
+    _sessionRef = Provider.of<UserSession>(context, listen: false);
+    _sessionListener = () { _loadDisplayName(); };
+    _sessionRef!.addListener(_sessionListener!);
+    _loadDisplayName();
+  }
+
+  Future<void> _loadDisplayName() async {
+    final user = Supabase.instance.client.auth.currentUser;
+    final emailPrefix = user?.email?.split('@').first;
+    if (user == null) {
+      if (!mounted) return;
+      setState(() { _displayName = emailPrefix ?? 'User'; _avatarUrl = null; });
+      return;
+    }
+    final profile = await ProfileService(Supabase.instance.client).getProfile(user.id);
+    final first = (profile?['first_name'] as String?)?.trim();
+    final last = (profile?['last_name'] as String?)?.trim();
+    final full = [first, last].where((e) => e != null && e!.isNotEmpty).join(' ').trim();
+    final dynamicMeta = user.userMetadata;
+    final Map<String, dynamic> authMeta =
+        (dynamicMeta is Map<String, dynamic>) ? dynamicMeta : const <String, dynamic>{};
+    final fallbackAvatar = (authMeta['avatar_url'] ?? authMeta['picture']) as String?;
+    if (!mounted) return;
+    setState(() {
+      _displayName = (full.isNotEmpty) ? full : (emailPrefix ?? 'User');
+      _avatarUrl = (profile?['image_url'] as String?) ?? fallbackAvatar;
     });
   }
 
@@ -67,55 +104,32 @@ class _HomeScreenState extends State<HomeScreen> {
     setState(() { _isLoading = true; _error = null; });
     try {
       print('Starting to load data...');
-      
-      // For now, let's create some dummy data to test if the UI works
-      // Comment out the database call temporarily
-      /*
-      final services = await _fetchServicesFromVendorProfiles();
-      setState(() {
-        _featuredServices = services.take(6).toList();
-      });
-      */
-      
-      // Create dummy services for testing
-      final dummyServices = [
-        ServiceItem(
-          id: '1',
-          name: 'Wedding Photography',
-          price: 25000.0,
-          description: 'Professional wedding photography services',
-          tags: ['photography', 'wedding'],
-          media: [],
-          vendorId: 'vendor1',
-          vendorName: 'Photo Studio',
-        ),
-        ServiceItem(
-          id: '2',
-          name: 'Event Catering',
-          price: 15000.0,
-          description: 'Delicious catering for your special events',
-          tags: ['catering', 'food'],
-          media: [],
-          vendorId: 'vendor2',
-          vendorName: 'Taste Caterers',
-        ),
-        ServiceItem(
-          id: '3',
-          name: 'Venue Decoration',
-          price: 20000.0,
-          description: 'Beautiful venue decoration services',
-          tags: ['decoration', 'venue'],
-          media: [],
-          vendorId: 'vendor3',
-          vendorName: 'Decor Studio',
-        ),
-      ];
-      
-      setState(() {
-        _featuredServices = dummyServices.take(6).toList();
-      });
-      
-      print('Data loaded successfully with ${_featuredServices.length} services');
+      final client = Supabase.instance.client;
+      final result = await client
+          .from('services')
+          .select('*')
+          .eq('is_active', true)
+          .eq('is_visible_to_users', true)
+          .eq('is_featured', true)
+          .order('updated_at', ascending: false)
+          .limit(12);
+
+      final services = (result as List<dynamic>).map((row) => ServiceItem(
+        id: row['id'],
+        categoryId: row['category_id'],
+        name: row['name'],
+        price: (row['price'] ?? 0).toDouble(),
+        tags: List<String>.from(row['tags'] ?? []),
+        description: row['description'] ?? '',
+        media: (row['media_urls'] as List<dynamic>?)
+                ?.map((url) => MediaItem(url: url.toString(), type: MediaType.image))
+                .toList() ?? [],
+        vendorId: row['vendor_id'] ?? '',
+        vendorName: '',
+      )).toList();
+
+      setState(() { _featuredServices = services.take(6).toList(); });
+      print('Loaded featured services: ${_featuredServices.length}');
     } catch (e) {
       print('Error loading data: $e');
       setState(() { _error = e.toString(); });
@@ -203,23 +217,15 @@ class _HomeScreenState extends State<HomeScreen> {
           child: Row(
             children: [
               // Profile picture
-              Container(
-                width: 50,
-                height: 50,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  gradient: LinearGradient(
-                    colors: [
-                      const Color(0xFFFDBB42),
-                      const Color(0xFFFDBB42).withOpacity(0.8),
-                    ],
-                  ),
-                ),
-                child: const Icon(
-                  Icons.person,
-                  color: Colors.white,
-                  size: 28,
-                ),
+              CircleAvatar(
+                radius: 25,
+                backgroundColor: const Color(0xFFFDBB42),
+                backgroundImage: (_avatarUrl != null && _avatarUrl!.isNotEmpty)
+                    ? NetworkImage(_avatarUrl!)
+                    : null,
+                child: (_avatarUrl == null || _avatarUrl!.isEmpty)
+                    ? const Icon(Icons.person, color: Colors.white, size: 28)
+                    : null,
               ),
               const SizedBox(width: 12),
               
@@ -229,7 +235,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      'Hello ${user?.email?.split('@').first ?? 'User'}',
+                      'Hello, ${_displayName ?? user?.email?.split('@').first ?? 'User'}',
                       style: const TextStyle(
                         fontSize: 18,
                         fontWeight: FontWeight.w600,
@@ -444,7 +450,7 @@ class _HomeScreenState extends State<HomeScreen> {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               const Text(
-                'Events',
+                'Featured Events',
                 style: TextStyle(
                   fontSize: 20,
                   fontWeight: FontWeight.bold,
@@ -555,22 +561,22 @@ class _HomeScreenState extends State<HomeScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Event image placeholder
-          Container(
-            height: 100,
-            decoration: BoxDecoration(
+          // Event image
+          ClipRRect(
+            borderRadius: const BorderRadius.only(topLeft: Radius.circular(12), topRight: Radius.circular(12)),
+            child: Container(
+              height: 100,
+              width: double.infinity,
               color: const Color(0xFFFDBB42).withOpacity(0.1),
-              borderRadius: const BorderRadius.only(
-                topLeft: Radius.circular(12),
-                topRight: Radius.circular(12),
-              ),
-            ),
-            child: Center(
-              child: Icon(
-                _getServiceIcon(service.name),
-                size: 32,
-                color: const Color(0xFFFDBB42),
-              ),
+              child: service.media.isNotEmpty
+                  ? Image.network(service.media.first.url, fit: BoxFit.cover)
+                  : Center(
+                      child: Icon(
+                        _getServiceIcon(service.name),
+                        size: 32,
+                        color: const Color(0xFFFDBB42),
+                      ),
+                    ),
             ),
           ),
           
@@ -628,5 +634,13 @@ class _HomeScreenState extends State<HomeScreen> {
     } else {
       return Icons.miscellaneous_services;
     }
+  }
+
+  @override
+  void dispose() {
+    if (_sessionListener != null) {
+      _sessionRef?.removeListener(_sessionListener!);
+    }
+    super.dispose();
   }
 }

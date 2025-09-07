@@ -49,6 +49,8 @@ dependencies:
   
   # Authentication
   google_sign_in: ^6.2.1
+  image_picker: ^1.1.2
+  path: ^1.9.0
   
   # Theming and fonts
   google_fonts: ^6.2.1

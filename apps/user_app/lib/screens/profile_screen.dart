@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../core/session.dart';
 import '../services/profile_service.dart';
+import 'profile_details_screen.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -65,7 +66,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final user = context.watch<UserSession>().currentUser;
+    final session = context.watch<UserSession>();
+    final user = session.currentUser;
     return Scaffold(
       appBar: AppBar(title: const Text('Profile')),
       body: _loading
@@ -73,13 +75,20 @@ class _ProfileScreenState extends State<ProfileScreen> {
           : ListView(
               padding: const EdgeInsets.all(16),
               children: [
-                // Avatar and title
                 Center(
-                  child: CircleAvatar(
-                    radius: 40,
-                    backgroundColor: Colors.grey[100],
-                    child: const Icon(Icons.person, size: 40, color: Colors.black87),
-                  ),
+                  child: Builder(builder: (context) {
+                    final authMeta = user?.userMetadata ?? {};
+                    final fallbackAvatar = (authMeta['avatar_url'] ?? authMeta['picture']) as String?;
+                    final imageUrl = (_profile?['image_url'] as String?) ?? fallbackAvatar;
+                    return CircleAvatar(
+                      radius: 40,
+                      backgroundColor: Colors.grey[100],
+                      backgroundImage: (imageUrl != null && imageUrl.isNotEmpty) ? NetworkImage(imageUrl) : null,
+                      child: (imageUrl == null || imageUrl.isEmpty)
+                          ? const Icon(Icons.person, size: 40, color: Colors.black87)
+                          : null,
+                    );
+                  }),
                 ),
                 const SizedBox(height: 12),
                 Center(
@@ -91,53 +100,21 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   ),
                 ),
                 const SizedBox(height: 24),
-
-                // Profile details card similar to vendor list tiles grouping
-                Card(
-                  elevation: 0,
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                  child: Padding(
-                    padding: const EdgeInsets.all(16.0),
-                    child: Form(
-                      key: _formKey,
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          const Text('Profile details', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
-                          const SizedBox(height: 12),
-                          TextFormField(
-                            controller: _firstNameController,
-                            decoration: const InputDecoration(labelText: 'First name'),
-                            validator: (v) => (v == null || v.trim().isEmpty) ? 'Enter first name' : null,
-                          ),
-                          const SizedBox(height: 12),
-                          TextFormField(
-                            controller: _lastNameController,
-                            decoration: const InputDecoration(labelText: 'Last name'),
-                            validator: (v) => (v == null || v.trim().isEmpty) ? 'Enter last name' : null,
-                          ),
-                          const SizedBox(height: 12),
-                          TextFormField(
-                            controller: _phoneController,
-                            decoration: const InputDecoration(labelText: 'Phone number'),
-                            keyboardType: TextInputType.phone,
-                          ),
-                          const SizedBox(height: 16),
-                          SizedBox(
-                            width: double.infinity,
-                            child: FilledButton(
-                              onPressed: _loading ? null : _save,
-                              child: const Text('Save changes'),
-                            ),
-                          )
-                        ],
-                      ),
-                    ),
-                  ),
+                ListTile(
+                  leading: const Icon(Icons.badge_outlined),
+                  title: const Text('Profile Details'),
+                  trailing: const Icon(Icons.chevron_right),
+                  onTap: () async {
+                    final changed = await Navigator.of(context).push<bool>(
+                      MaterialPageRoute(builder: (_) => const ProfileDetailsScreen()),
+                    );
+                    if (changed == true) {
+                      _load();
+                    }
+                  },
                 ),
-
+                const Divider(),
                 const SizedBox(height: 24),
-                // Sign out
                 FilledButton(
                   onPressed: () async {
                     final shouldLogout = await showDialog<bool>(
@@ -154,7 +131,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     if (shouldLogout == true) {
                       await context.read<UserSession>().signOut();
                       if (context.mounted) {
-                        // Router will redirect
                         Navigator.of(context).popUntil((r) => r.isFirst);
                       }
                     }

@@ -10,6 +10,7 @@ import 'package:flutter_svg/flutter_svg.dart';
 import 'service_service.dart';
 import 'availability_service.dart';
 import '../../widgets/availability_calendar.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 
 class ServicesScreen extends StatefulWidget {
@@ -1792,6 +1793,21 @@ class _AddServicePageState extends State<_AddServicePage> {
   bool _isSaving = false;
   final AvailabilityCalendarController _availabilityController = AvailabilityCalendarController();
 
+  // Extra fields for new service schema
+  final _capacityMinCtrl = TextEditingController();
+  final _capacityMaxCtrl = TextEditingController();
+  final _parkingCtrl = TextEditingController();
+
+  final _suitedCtrl = TextEditingController();
+  final List<String> _suitedFor = <String>[];
+
+  final _policyCtrl = TextEditingController();
+  final List<String> _policies = <String>[];
+
+  final _featKeyCtrl = TextEditingController();
+  final _featValCtrl = TextEditingController();
+  final List<MapEntry<String, String>> _features = <MapEntry<String, String>>[];
+
   void _addTagFromInput() {
     final raw = _tagCtrl.text.trim();
     if (raw.isEmpty) return;
@@ -1802,6 +1818,38 @@ class _AddServicePageState extends State<_AddServicePage> {
       }
     }
     _tagCtrl.clear();
+    setState(() {});
+  }
+
+  void _addSuitedFromInput() {
+    final raw = _suitedCtrl.text.trim();
+    if (raw.isEmpty) return;
+    for (final part in raw.split(',')) {
+      final v = part.trim();
+      if (v.isNotEmpty && !_suitedFor.contains(v)) _suitedFor.add(v);
+    }
+    _suitedCtrl.clear();
+    setState(() {});
+  }
+
+  void _addPolicyFromInput() {
+    final raw = _policyCtrl.text.trim();
+    if (raw.isEmpty) return;
+    for (final part in raw.split(',')) {
+      final v = part.trim();
+      if (v.isNotEmpty && !_policies.contains(v)) _policies.add(v);
+    }
+    _policyCtrl.clear();
+    setState(() {});
+  }
+
+  void _addFeatureKV() {
+    final k = _featKeyCtrl.text.trim();
+    final v = _featValCtrl.text.trim();
+    if (k.isEmpty || v.isEmpty) return;
+    _features.add(MapEntry(k, v));
+    _featKeyCtrl.clear();
+    _featValCtrl.clear();
     setState(() {});
   }
 
@@ -1863,6 +1911,37 @@ class _AddServicePageState extends State<_AddServicePage> {
     setState(() => _media.removeAt(index));
   }
 
+  Future<List<String>> _prepareMediaUrls() async {
+    final client = Supabase.instance.client;
+    final userId = client.auth.currentUser?.id ?? 'anon';
+    final List<String> urls = <String>[];
+    for (final m in _media) {
+      final raw = m.url;
+      if (raw.startsWith('http')) {
+        urls.add(raw);
+        continue;
+      }
+      // Only upload images to public bucket
+      if (m.type != MediaType.image) {
+        continue;
+      }
+      try {
+        final file = File(raw);
+        if (!await file.exists()) {
+          continue;
+        }
+        final name = raw.split('/').isNotEmpty ? raw.split('/').last : 'media.jpg';
+        final objectPath = 'services/$userId/${DateTime.now().millisecondsSinceEpoch}_$name';
+        await client.storage.from('service-media').upload(objectPath, file);
+        final publicUrl = client.storage.from('service-media').getPublicUrl(objectPath);
+        urls.add(publicUrl);
+      } catch (e) {
+        // Skip failed uploads
+      }
+    }
+    return urls;
+  }
+
   Future<void> _save() async {
     if (!_formKey.currentState!.validate()) return;
 
@@ -1871,8 +1950,24 @@ class _AddServicePageState extends State<_AddServicePage> {
     });
 
     try {
-      // Convert media to URLs (for now, just use the paths as URLs)
-      final mediaUrls = _media.map((m) => m.url).toList();
+      // Upload local media to Supabase Storage and collect public URLs
+      final mediaUrls = await _prepareMediaUrls();
+
+      final capMin = int.tryParse(_capacityMinCtrl.text.trim());
+      final capMax = int.tryParse(_capacityMaxCtrl.text.trim());
+      final parking = int.tryParse(_parkingCtrl.text.trim());
+
+      if (capMin != null && capMax != null && capMin > capMax) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Capacity min cannot be greater than max')),
+        );
+        setState(() => _isSaving = false);
+        return;
+      }
+
+      final featuresMap = _features.isEmpty
+          ? null
+          : { for (final e in _features) e.key: e.value };
 
       final service = await ServiceService().createService(
         name: _nameCtrl.text.trim(),
@@ -1881,6 +1976,13 @@ class _AddServicePageState extends State<_AddServicePage> {
         tags: List<String>.from(_tags),
         description: _descCtrl.text.trim(),
         mediaUrls: mediaUrls,
+        capacityMin: capMin,
+        capacityMax: capMax,
+        parkingSpaces: parking,
+        suitedFor: _suitedFor.isEmpty ? null : _suitedFor,
+        features: featuresMap,
+        policies: _policies.isEmpty ? null : _policies,
+        isActive: _enabled,
       );
 
       if (service != null) {
@@ -2056,6 +2158,142 @@ class _AddServicePageState extends State<_AddServicePage> {
                     );
                   },
                 ),
+              const SizedBox(height: 16),
+
+              // Service details block for new schema fields
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(12),
+                  boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 8, offset: const Offset(0, 2))],
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text('Service Details', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
+                    const SizedBox(height: 12),
+
+                    Row(
+                      children: [
+                        Expanded(
+                          child: TextField(
+                            controller: _capacityMinCtrl,
+                            decoration: const InputDecoration(labelText: 'Capacity Min'),
+                            keyboardType: TextInputType.number,
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: TextField(
+                            controller: _capacityMaxCtrl,
+                            decoration: const InputDecoration(labelText: 'Capacity Max'),
+                            keyboardType: TextInputType.number,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+
+                    TextField(
+                      controller: _parkingCtrl,
+                      decoration: const InputDecoration(labelText: 'Parking Spaces'),
+                      keyboardType: TextInputType.number,
+                    ),
+                    const SizedBox(height: 16),
+
+                    const Text('Suited For'),
+                    const SizedBox(height: 6),
+                    Wrap(
+                      spacing: 6,
+                      runSpacing: 6,
+                      children: [
+                        ..._suitedFor.map(
+                          (t) => Chip(
+                            label: Text(t),
+                            onDeleted: () => setState(() => _suitedFor.remove(t)),
+                            materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                          ),
+                        ),
+                        SizedBox(
+                          width: 200,
+                          child: TextField(
+                            controller: _suitedCtrl,
+                            decoration: const InputDecoration(hintText: 'Add item'),
+                            onSubmitted: (_) => _addSuitedFromInput(),
+                            onChanged: (v) { if (v.contains(',')) _addSuitedFromInput(); },
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 16),
+
+                    const Text('Features (key/value)'),
+                    const SizedBox(height: 6),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: TextField(
+                            controller: _featKeyCtrl,
+                            decoration: const InputDecoration(hintText: 'Key (e.g., AC)'),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: TextField(
+                            controller: _featValCtrl,
+                            decoration: const InputDecoration(hintText: 'Value (e.g., Yes)'),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        FilledButton(onPressed: _addFeatureKV, child: const Text('Add')),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                    if (_features.isNotEmpty)
+                      Wrap(
+                        spacing: 6,
+                        runSpacing: 6,
+                        children: _features.map((e) {
+                          final label = '${e.key}: ${e.value}';
+                          return Chip(
+                            label: Text(label),
+                            onDeleted: () {
+                              setState(() => _features.remove(e));
+                            },
+                          );
+                        }).toList(),
+                      ),
+                    const SizedBox(height: 16),
+
+                    const Text('Policies'),
+                    const SizedBox(height: 6),
+                    Wrap(
+                      spacing: 6,
+                      runSpacing: 6,
+                      children: [
+                        ..._policies.map(
+                          (t) => Chip(
+                            label: Text(t),
+                            onDeleted: () => setState(() => _policies.remove(t)),
+                            materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                          ),
+                        ),
+                        SizedBox(
+                          width: 250,
+                          child: TextField(
+                            controller: _policyCtrl,
+                            decoration: const InputDecoration(hintText: 'Add policy'),
+                            onSubmitted: (_) => _addPolicyFromInput(),
+                            onChanged: (v) { if (v.contains(',')) _addPolicyFromInput(); },
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+
               const SizedBox(height: 16),
               Container(
                 padding: const EdgeInsets.all(12),

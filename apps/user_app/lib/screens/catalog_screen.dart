@@ -1,11 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-import 'package:provider/provider.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import '../models/service_models.dart';
 import '../services/service_service.dart';
-import '../core/session.dart';
-import 'booking_screen.dart';
+import 'service_details_screen.dart';
 import '../core/cache/simple_cache.dart';
 
 
@@ -22,12 +20,19 @@ class _CatalogScreenState extends State<CatalogScreen> {
   final SupabaseClient _supabase = Supabase.instance.client;
   late final ServiceService _serviceService;
 
-  List<CategoryNode> _categories = <CategoryNode>[];
-  List<ServiceItem> _services = <ServiceItem>[];
+  List<ServiceItem> _services = <ServiceItem>[]; // filtered view
+  List<ServiceItem> _allServices = <ServiceItem>[]; // original
   String? _selectedCategoryId;
   bool _isLoading = true;
   String _query = '';
   String? _error;
+
+  // Filters
+  double? _minPrice;
+  double? _maxPrice;
+  double? _currentMinPrice;
+  double? _currentMaxPrice;
+  double _minRating = 0; // visual only, because we don't have ratings in schema
 
   @override
   void initState() {
@@ -63,8 +68,17 @@ class _CatalogScreenState extends State<CatalogScreen> {
       }
       
       setState(() {
-        _categories = categories;
-        _services = services;
+        _allServices = services;
+        // init price bounds
+        final prices = _allServices.map((s) => s.price).where((p) => p.isFinite).toList();
+        if (prices.isNotEmpty) {
+          prices.sort();
+          _minPrice = prices.first;
+          _maxPrice = prices.last;
+          _currentMinPrice = _minPrice;
+          _currentMaxPrice = _maxPrice;
+        }
+        _applyFilters();
       });
     } catch (e) {
       print('Error loading data: $e');
@@ -77,30 +91,34 @@ class _CatalogScreenState extends State<CatalogScreen> {
   Future<List<ServiceItem>> _loadServicesByVendorCategory(String categoryName) async {
     try {
       print('Loading services for vendor category: $categoryName');
-      final cacheKey = 'services:vendorCategory:${categoryName.toLowerCase()}';
-      final response = await CacheManager.instance.getOrFetch<List<dynamic>>(
-        cacheKey,
-        const Duration(minutes: 5),
-        () async {
-          return await _supabase
-              .from('services')
-              .select('''
-                id,
-                name,
-                description,
-                price,
-                media_urls,
-                vendor_id,
-                vendor_profiles!inner(
-                  id,
-                  business_name,
-                  category
-                )
-              ''')
-              .eq('vendor_profiles.category', categoryName)
-              .limit(50);
-        },
-      );
+      // Direct fetch (no cache) to reflect latest changes immediately
+      final response = await _supabase
+          .from('services')
+          .select('''
+            id,
+            name,
+            description,
+            price,
+            media_urls,
+            vendor_id,
+            capacity_min,
+            capacity_max,
+            rating_avg,
+            rating_count,
+            parking_spaces,
+            suited_for,
+            features,
+            policies,
+            vendor_profiles!inner(
+              id,
+              business_name
+            )
+          ''')
+          .eq('category', categoryName)
+          .eq('is_active', true)
+          .eq('is_visible_to_users', true)
+          .order('created_at', ascending: false)
+          .limit(100);
 
       print('Raw response: $response');
       print('Response length: ${response.length}');
@@ -117,11 +135,21 @@ class _CatalogScreenState extends State<CatalogScreen> {
           description: data['description'] ?? 'Service from ${vendorData['business_name']}',
           tags: [],
           media: (data['media_urls'] as List<dynamic>?)
-                  ?.map((url) => MediaItem(url: url, type: MediaType.image))
+                  ?.map((url) => MediaItem(url: url.toString(), type: MediaType.image))
                   .toList() ??
               [],
           vendorId: data['vendor_id']?.toString() ?? '',
           vendorName: vendorData['business_name'] ?? 'Unknown Vendor',
+          capacityMin: data['capacity_min'] as int?,
+          capacityMax: data['capacity_max'] as int?,
+          parkingSpaces: data['parking_spaces'] as int?,
+          ratingAvg: (data['rating_avg'] is num) ? (data['rating_avg'] as num).toDouble() : null,
+          ratingCount: data['rating_count'] as int?,
+          suitedFor: List<String>.from((data['suited_for'] as List<dynamic>?) ?? const <String>[]),
+          features: (data['features'] is Map<String, dynamic>)
+              ? (data['features'] as Map<String, dynamic>)
+              : const <String, dynamic>{},
+          policies: List<String>.from((data['policies'] as List<dynamic>?) ?? const <String>[]),
         );
       }).toList();
 
@@ -144,21 +172,128 @@ class _CatalogScreenState extends State<CatalogScreen> {
     setState(() { _isLoading = true; });
     try {
       if (_query.isNotEmpty) {
-        // If there's a search query, search services
-        final results = await _serviceService.searchServices(_query);
-        setState(() { _services = results; });
+        // client-side search for responsiveness
+        setState(() {
+          _services = _allServices
+              .where((s) => s.name.toLowerCase().contains(_query.toLowerCase()))
+              .toList();
+        });
       } else if (widget.selectedCategory != null) {
         // If a category was pre-selected from home page, reload services for that category
         final results = await _loadServicesByVendorCategory(widget.selectedCategory!);
-        setState(() { _services = results; });
+        setState(() { _allServices = results; });
+        _applyFilters();
       } else if (_selectedCategoryId != null) {
         // If a category was selected from the filter chips, get services for that category
         final results = await _serviceService.getServicesByCategory(_selectedCategoryId!);
-        setState(() { _services = results; });
+        setState(() { _allServices = results; });
+        _applyFilters();
       }
     } finally {
       if (mounted) setState(() { _isLoading = false; });
     }
+  }
+
+  void _applyFilters() {
+    var list = List<ServiceItem>.from(_allServices);
+    // price filter
+    if (_currentMinPrice != null && _currentMaxPrice != null) {
+      list = list
+          .where((s) => s.price >= _currentMinPrice! && s.price <= _currentMaxPrice!)
+          .toList();
+    }
+    // rating filter (visual only, use 4.5 as placeholder)
+    final placeholderRating = 4.5;
+    list = list.where((_) => placeholderRating >= _minRating).toList();
+    // query filter if any
+    if (_query.isNotEmpty) {
+      list = list.where((s) => s.name.toLowerCase().contains(_query.toLowerCase())).toList();
+    }
+    _services = list;
+  }
+
+  void _openFilterSheet() {
+    final minP = _minPrice ?? 0;
+    final maxP = _maxPrice ?? 100000;
+    double tempMin = _currentMinPrice ?? minP;
+    double tempMax = _currentMaxPrice ?? maxP;
+    double tempRating = _minRating;
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      builder: (context) {
+        return Padding(
+          padding: EdgeInsets.only(
+            bottom: MediaQuery.of(context).viewInsets.bottom + 16,
+            left: 16,
+            right: 16,
+            top: 16,
+          ),
+          child: StatefulBuilder(
+            builder: (context, setLocal) => Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    const Text('Filters', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700)),
+                    IconButton(onPressed: () => Navigator.pop(context), icon: const Icon(Icons.close)),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                const Text('Price range'),
+                RangeSlider(
+                  values: RangeValues(tempMin.clamp(minP, maxP), tempMax.clamp(minP, maxP)),
+                  min: minP,
+                  max: maxP,
+                  divisions: 20,
+                  labels: RangeLabels('₹${tempMin.toStringAsFixed(0)}', '₹${tempMax.toStringAsFixed(0)}'),
+                  onChanged: (v) => setLocal(() { tempMin = v.start; tempMax = v.end; }),
+                ),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text('Min: ₹${tempMin.toStringAsFixed(0)}'),
+                    Text('Max: ₹${tempMax.toStringAsFixed(0)}'),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                const Text('Rating'),
+                Slider(
+                  value: tempRating,
+                  onChanged: (v) => setLocal(() { tempRating = v; }),
+                  min: 0,
+                  max: 5,
+                  divisions: 5,
+                  label: '${tempRating.toStringAsFixed(1)}+',
+                ),
+                const SizedBox(height: 12),
+                SizedBox(
+                  width: double.infinity,
+                  child: FilledButton(
+                    onPressed: () {
+                      setState(() {
+                        _currentMinPrice = tempMin;
+                        _currentMaxPrice = tempMax;
+                        _minRating = tempRating;
+                        _applyFilters();
+                      });
+                      Navigator.pop(context);
+                    },
+                    child: const Text('Apply filters'),
+                  ),
+                ),
+                const SizedBox(height: 8),
+              ],
+            ),
+          ),
+        );
+      },
+    );
   }
 
   @override
@@ -166,161 +301,69 @@ class _CatalogScreenState extends State<CatalogScreen> {
     return Scaffold(
       body: SafeArea(
         child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Title section
-            if (widget.selectedCategory != null)
-              Container(
-                width: double.infinity,
-                padding: const EdgeInsets.all(16),
-                margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                decoration: BoxDecoration(
-                  color: const Color(0xFFFDBB42).withOpacity(0.1),
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(
-                    color: const Color(0xFFFDBB42).withOpacity(0.3),
-                  ),
-                ),
+            if (widget.selectedCategory != null) ...[
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
                 child: Row(
                   children: [
-                    Icon(
-                      _getCategoryIcon(widget.selectedCategory!),
-                      color: const Color(0xFFFDBB42),
-                      size: 24,
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            '${widget.selectedCategory} Services',
-                            style: const TextStyle(
-                              fontSize: 18,
-                              fontWeight: FontWeight.bold,
-                              color: Colors.black87,
-                            ),
-                          ),
-                          Text(
-                            'Services from ${widget.selectedCategory} vendors',
-                            style: TextStyle(
-                              fontSize: 14,
-                              color: Colors.grey[600],
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
                     IconButton(
-                      onPressed: () => Navigator.of(context).pop(),
-                      icon: const Icon(Icons.close),
-                      color: Colors.grey[600],
+                      onPressed: () => Navigator.of(context).maybePop(),
+                      icon: const Icon(Icons.arrow_back),
+                    ),
+                    const SizedBox(width: 4),
+                    Text(
+                      widget.selectedCategory!,
+                      style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w700),
                     ),
                   ],
                 ),
               ),
+              const Padding(
+                padding: EdgeInsets.fromLTRB(20, 0, 20, 8),
+                child: Text('Explore vendor\'s section', style: TextStyle(color: Colors.grey, fontSize: 12)),
+              ),
+            ],
             
-            // User profile section
-            Consumer<UserSession>(
-              builder: (context, session, _) {
-                final user = session.currentUser;
-                return Container(
-                  padding: const EdgeInsets.all(16),
-                  margin: const EdgeInsets.all(16),
-                  decoration: BoxDecoration(
-                    color: Theme.of(context).colorScheme.primaryContainer,
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(
-                      color: Theme.of(context).colorScheme.outline.withOpacity(0.2),
-                    ),
-                  ),
-                  child: Row(
-                    children: [
-                      CircleAvatar(
-                        backgroundColor: Theme.of(context).colorScheme.primary,
-                        child: Icon(
-                          Icons.person,
-                          color: Theme.of(context).colorScheme.onPrimary,
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              'Welcome!',
-                              style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                            Text(
-                              user?.email ?? 'User',
-                              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                                color: Theme.of(context).colorScheme.onSurfaceVariant,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      Icon(
-                        Icons.verified,
-                        color: Theme.of(context).colorScheme.primary,
-                        size: 20,
-                      ),
-                    ],
-                  ),
-                );
-              },
-            ),
             Padding(
-              padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
-              child: TextField(
-                decoration: InputDecoration(
-                  hintText: 'Search services...',
-                  prefixIcon: const Icon(Icons.search),
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-                  isDense: true,
+              padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
+              child: Container(
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(12),
+                  boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 10, offset: const Offset(0, 4))],
+                  border: Border.all(color: Colors.black.withOpacity(0.05)),
                 ),
-                onChanged: (value) {
-                  _query = value.trim();
-                  _refresh();
-                },
+                child: Row(
+                  children: [
+                    const SizedBox(width: 12),
+                    const Icon(Icons.search, color: Colors.grey),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: TextField(
+                        decoration: const InputDecoration(
+                          hintText: 'Search',
+                          isCollapsed: true,
+                          border: InputBorder.none,
+                        ),
+                        onChanged: (value) {
+                          _query = value.trim();
+                          setState(() { _applyFilters(); });
+                        },
+                      ),
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.tune, color: Colors.grey),
+                      onPressed: () {
+                        _openFilterSheet();
+                      },
+                    )
+                  ],
+                ),
               ),
             ),
-            // Only show category filter if no specific category is pre-selected
-            if (widget.selectedCategory == null)
-              SizedBox(
-                height: 48,
-                child: ListView.separated(
-                  padding: const EdgeInsets.symmetric(horizontal: 12),
-                  scrollDirection: Axis.horizontal,
-                  itemBuilder: (context, index) {
-                    if (index == 0) {
-                      final isSelected = _selectedCategoryId == null;
-                      return FilterChip(
-                        label: const Text('All'),
-                        selected: isSelected,
-                        onSelected: (_) async {
-                          setState(() { _selectedCategoryId = null; _query = ''; });
-                          await _load();
-                        },
-                      );
-                    }
-                    final cat = _categories[index - 1];
-                    final isSelected = _selectedCategoryId == cat.id;
-                    return FilterChip(
-                      label: Text(cat.name),
-                      selected: isSelected,
-                      onSelected: (_) async {
-                        setState(() { _selectedCategoryId = cat.id; _query = ''; });
-                        await _refresh();
-                      },
-                    );
-                  },
-                  separatorBuilder: (_, __) => const SizedBox(width: 8),
-                  itemCount: _categories.length + 1,
-                ),
-              ),
+            // category chips removed per request
             const SizedBox(height: 8),
             Expanded(
               child: _isLoading
@@ -342,26 +385,31 @@ class _CatalogScreenState extends State<CatalogScreen> {
                           ),
                         )
                       : RefreshIndicator(
-                      onRefresh: _refresh,
-                      child: _services.isEmpty
-                          ? ListView(
-                              children: const [
-                                SizedBox(height: 80),
-                                Icon(Icons.search_off, size: 48, color: Colors.grey),
-                                SizedBox(height: 12),
-                                Center(child: Text('No services found')),
-                              ],
-                            )
-                          : ListView.separated(
-                              padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
-                              itemBuilder: (context, index) {
-                                final s = _services[index];
-                                return _buildServiceCard(context, s);
-                              },
-                              separatorBuilder: (_, __) => const SizedBox(height: 16),
-                              itemCount: _services.length,
-                            ),
-                      ),
+                          onRefresh: _refresh,
+                          child: _services.isEmpty
+                              ? ListView(
+                                  children: const [
+                                    SizedBox(height: 80),
+                                    Icon(Icons.search_off, size: 48, color: Colors.grey),
+                                    SizedBox(height: 12),
+                                    Center(child: Text('No services found')),
+                                  ],
+                                )
+                              : GridView.builder(
+                                  padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+                                  gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                                    crossAxisCount: 2,
+                                    crossAxisSpacing: 12,
+                                    mainAxisSpacing: 12,
+                                    childAspectRatio: 0.70,
+                                  ),
+                                  itemCount: _services.length,
+                                  itemBuilder: (context, index) {
+                                    final s = _services[index];
+                                    return _buildGridServiceCard(context, s);
+                                  },
+                                ),
+                        ),
             ),
            ],
          ),
@@ -369,262 +417,59 @@ class _CatalogScreenState extends State<CatalogScreen> {
      );
    }
 
-  Widget _buildServiceCard(BuildContext context, ServiceItem service) {
-    return Container(
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(20),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.08),
-            blurRadius: 20,
-            offset: const Offset(0, 8),
-            spreadRadius: 0,
-          ),
-        ],
-      ),
-      child: Card(
-        elevation: 0,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(20),
+  Widget _buildGridServiceCard(BuildContext context, ServiceItem service) {
+    return InkWell(
+      onTap: () {
+        Navigator.of(context).push(
+          MaterialPageRoute(builder: (_) => ServiceDetailsScreen(service: service)),
+        );
+      },
+      child: Container(
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(16),
+          boxShadow: [
+            BoxShadow(color: Colors.black.withOpacity(0.06), blurRadius: 12, offset: const Offset(0, 6)),
+          ],
+          border: Border.all(color: Colors.black.withOpacity(0.06)),
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Service Image Section
-            Container(
-              height: 180,
-              width: double.infinity,
-              decoration: BoxDecoration(
-                borderRadius: const BorderRadius.only(
-                  topLeft: Radius.circular(20),
-                  topRight: Radius.circular(20),
-                ),
-              ),
-              child: Stack(
-                fit: StackFit.expand,
-                children: [
-                  if (service.media.isNotEmpty)
-                    ClipRRect(
-                      borderRadius: const BorderRadius.only(
-                        topLeft: Radius.circular(20),
-                        topRight: Radius.circular(20),
-                      ),
-                      child: CachedNetworkImage(
-                        imageUrl: service.media.first.url,
+            ClipRRect(
+              borderRadius: const BorderRadius.only(topLeft: Radius.circular(16), topRight: Radius.circular(16)),
+              child: AspectRatio(
+                aspectRatio: 16 / 12,
+                child: (service.media.isNotEmpty)
+                    ? CachedNetworkImage(
+                        imageUrl: Uri.encodeFull(service.media.first.url),
                         fit: BoxFit.cover,
-                        placeholder: (context, url) => Container(color: const Color(0xFFFDBB42).withOpacity(0.08)),
-                        errorWidget: (context, url, error) => Container(color: const Color(0xFFFDBB42).withOpacity(0.08)),
-                      ),
-                    )
-                  else
-                    Container(
-                      decoration: BoxDecoration(
-                        gradient: LinearGradient(
-                          begin: Alignment.topLeft,
-                          end: Alignment.bottomRight,
-                          colors: [
-                            const Color(0xFFFDBB42).withOpacity(0.1),
-                            const Color(0xFFFDBB42).withOpacity(0.05),
-                          ],
-                        ),
-                        borderRadius: const BorderRadius.only(
-                          topLeft: Radius.circular(20),
-                          topRight: Radius.circular(20),
-                        ),
-                      ),
-                      child: Center(
-                        child: Container(
-                          width: 80,
-                          height: 80,
-                          decoration: BoxDecoration(
-                            color: const Color(0xFFFDBB42),
-                            borderRadius: BorderRadius.circular(20),
-                            boxShadow: [
-                              BoxShadow(
-                                color: const Color(0xFFFDBB42).withOpacity(0.3),
-                                blurRadius: 15,
-                                offset: const Offset(0, 5),
-                              ),
-                            ],
-                          ),
-                          child: Icon(
-                            _getServiceIcon(service.name),
-                            size: 40,
-                            color: Colors.white,
-                          ),
-                        ),
-                      ),
-                    ),
-                  Positioned(
-                    top: 16,
-                    right: 16,
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(20),
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.black.withOpacity(0.1),
-                            blurRadius: 8,
-                            offset: const Offset(0, 2),
-                          ),
-                        ],
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Text(
-                            '₹',
-                            style: TextStyle(
-                              fontSize: 16,
-                              fontWeight: FontWeight.bold,
-                              color: const Color(0xFFFDBB42),
-                            ),
-                          ),
-                          const SizedBox(width: 2),
-                          Text(
-                            service.price.toStringAsFixed(0),
-                            style: const TextStyle(
-                              fontSize: 16,
-                              fontWeight: FontWeight.bold,
-                              color: Colors.black87,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                ],
+                        placeholder: (c, _) => Container(color: Colors.black12.withOpacity(0.06)),
+                        errorWidget: (c, _, __) => Container(color: Colors.black12.withOpacity(0.06)),
+                      )
+                    : Container(color: Colors.black12.withOpacity(0.06)),
               ),
             ),
-            // Service Details Section
             Padding(
-              padding: const EdgeInsets.all(20),
+              padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // Service Name and Vendor
-                  Row(
-                    children: [
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              service.name,
-                              style: const TextStyle(
-                                fontSize: 20,
-                                fontWeight: FontWeight.bold,
-                                color: Colors.black87,
-                              ),
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                            const SizedBox(height: 4),
-                            Row(
-                              children: [
-                                Icon(
-                                  Icons.store,
-                                  size: 16,
-                                  color: Colors.grey[600],
-                                ),
-                                const SizedBox(width: 4),
-                                Text(
-                                  service.vendorName.isNotEmpty ? service.vendorName : 'Vendor',
-                                  style: TextStyle(
-                                    fontSize: 14,
-                                    color: Colors.grey[600],
-                                    fontWeight: FontWeight.w500,
-                                  ),
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                ),
-                              ],
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
+                  Text(
+                    service.name,
+                    style: const TextStyle(fontWeight: FontWeight.w700),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
                   ),
-                  // Description
-                  if (service.description.isNotEmpty) ...[
-                    const SizedBox(height: 12),
-                    Text(
-                      service.description,
-                      style: TextStyle(
-                        fontSize: 14,
-                        color: Colors.grey[700],
-                        height: 1.4,
-                      ),
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ],
-                  // Tags
-                  if (service.tags.isNotEmpty) ...[
-                    const SizedBox(height: 12),
-                    Wrap(
-                      spacing: 8,
-                      runSpacing: 6,
-                      children: service.tags.take(3).map((tag) => Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFFFDBB42).withOpacity(0.1),
-                          borderRadius: BorderRadius.circular(15),
-                          border: Border.all(
-                            color: const Color(0xFFFDBB42).withOpacity(0.3),
-                            width: 1,
-                          ),
-                        ),
-                        child: Text(
-                          tag,
-                          style: TextStyle(
-                            fontSize: 12,
-                            fontWeight: FontWeight.w500,
-                            color: const Color(0xFFFDBB42),
-                          ),
-                        ),
-                      )).toList(),
-                    ),
-                  ],
-                  // Book Now Button
-                  const SizedBox(height: 16),
-                  SizedBox(
-                    width: double.infinity,
-                    height: 50,
-                    child: ElevatedButton(
-                      onPressed: () {
-                        Navigator.of(context).push(
-                          MaterialPageRoute(
-                            builder: (context) => BookingScreen(service: service),
-                          ),
-                        );
-                      },
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color(0xFFFDBB42),
-                        foregroundColor: Colors.white,
-                        elevation: 0,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(15),
-                        ),
-                        shadowColor: const Color(0xFFFDBB42).withOpacity(0.3),
-                      ),
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          const Icon(Icons.calendar_today, size: 18),
-                          const SizedBox(width: 8),
-                          const Text(
-                            'Book Now',
-                            style: TextStyle(
-                              fontSize: 16,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
+                  const SizedBox(height: 4),
+                  Text('Capacity - 0', style: TextStyle(color: Colors.grey[600], fontSize: 12)),
+                  const SizedBox(height: 6),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text('₹ ${service.price.toStringAsFixed(0)}/-', style: const TextStyle(fontWeight: FontWeight.w800)),
+                      Row(children: const [Icon(Icons.star, size: 14, color: Color(0xFFFFC107)), SizedBox(width: 4), Text('4.5k')]),
+                    ],
                   ),
                 ],
               ),
@@ -633,40 +478,5 @@ class _CatalogScreenState extends State<CatalogScreen> {
         ),
       ),
     );
-  }
-
-  IconData _getCategoryIcon(String categoryName) {
-    final name = categoryName.toLowerCase();
-    if (name.contains('photography')) return Icons.camera_alt;
-    if (name.contains('decoration')) return Icons.local_florist;
-    if (name.contains('catering')) return Icons.restaurant;
-    if (name.contains('farmhouse')) return Icons.home;
-    if (name.contains('music') || name.contains('dj')) return Icons.music_note;
-    if (name.contains('venue')) return Icons.location_on;
-    if (name.contains('event essentials')) return Icons.event;
-    return Icons.category;
-  }
-
-  IconData _getServiceIcon(String serviceName) {
-    final name = serviceName.toLowerCase();
-    if (name.contains('photography') || name.contains('photo') || name.contains('camera')) {
-      return Icons.camera_alt;
-    } else if (name.contains('catering') || name.contains('food') || name.contains('meal')) {
-      return Icons.restaurant;
-    } else if (name.contains('decoration') || name.contains('decor') || name.contains('flower')) {
-      return Icons.local_florist;
-    } else if (name.contains('music') || name.contains('dj') || name.contains('sound')) {
-      return Icons.music_note;
-    } else if (name.contains('venue') || name.contains('hall') || name.contains('place')) {
-      return Icons.location_on;
-    } else if (name.contains('transport') || name.contains('car') || name.contains('vehicle')) {
-      return Icons.directions_car;
-    } else if (name.contains('makeup') || name.contains('beauty') || name.contains('salon')) {
-      return Icons.face;
-    } else if (name.contains('dress') || name.contains('clothing') || name.contains('suit')) {
-      return Icons.checkroom;
-    } else {
-      return Icons.miscellaneous_services;
-    }
   }
 }
