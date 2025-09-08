@@ -1,0 +1,20 @@
+# Node
+node_modules/
+.npm/
+.pnpm-store/
+apps/company_web/.next/
+apps/company_web/out/
+
+# Flutter/Dart
+.dart_tool/.buildlog/.packages
+build/
+ios/Pods/
+macos/Pods/
+linux/build/
+windows/build/
+web/.dart_tool/.pub-cache/
+
+# Misc
+.DS_Store
+dist/
+bfg-*.jar
