@@ -35,6 +35,41 @@ export default function InvitePage({ params }: { params: { slug: string } }) {
   if (loading) return <div className="p-6">Loading…</div>;
   if (!inv) return <div className="p-6">Invitation not found</div>;
 
+  const openInApp = () => {
+    const appLink = `${window.location.origin}/invite/${inv.slug}`
+    const isAndroid = /Android/i.test(navigator.userAgent)
+    
+    if (isAndroid) {
+      // Try multiple approaches for Android
+      const packageName = 'com.example.saral_events_user_app'
+      
+      // Method 1: Direct intent with fallback
+      const intent = `intent://invite/${inv.slug}#Intent;scheme=https;package=${packageName};S.browser_fallback_url=${encodeURIComponent(appLink)};end`
+      
+      // Method 2: Custom scheme fallback
+      const customScheme = `saralevents://invite/${inv.slug}`
+      
+      // Try intent first, then custom scheme
+      const iframe = document.createElement('iframe')
+      iframe.style.display = 'none'
+      iframe.src = intent
+      document.body.appendChild(iframe)
+      
+      // Fallback to custom scheme after a delay
+      setTimeout(() => {
+        window.location.href = customScheme
+      }, 1000)
+      
+      // Final fallback to web page
+      setTimeout(() => {
+        window.location.href = appLink
+      }, 2000)
+    } else {
+      // For non-Android, just use the web link
+      window.location.href = appLink
+    }
+  }
+
   return (
     <div className="max-w-2xl mx-auto p-6">
       <div className="rounded-xl overflow-hidden border">
@@ -55,16 +90,18 @@ export default function InvitePage({ params }: { params: { slug: string } }) {
             )}
           </div>
           <div className="mt-5 space-x-3">
-            <Link className="inline-flex items-center px-4 py-2 rounded-md bg-black text-white" href={`/invite/${inv.slug}`}>
+            <button
+              className="inline-flex items-center px-4 py-2 rounded-md bg-black text-white"
+              onClick={openInApp}
+            >
               Open in app
-            </Link>
-            <Link
+            </button>
+            <a
               className="inline-flex items-center px-4 py-2 rounded-md bg-gray-900/80 text-white"
-              href={`https://saral-events.com/invite/${inv.slug}`}
-              target="_blank"
+              href={`/invite/${inv.slug}`}
             >
               View in browser
-            </Link>
+            </a>
           </div>
         </div>
       </div>

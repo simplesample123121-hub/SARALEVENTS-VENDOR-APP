@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:flutter/services.dart';
+import 'package:url_launcher/url_launcher.dart';
 import 'package:go_router/go_router.dart';
 import '../services/invitation_service.dart';
 import '../models/invitation_models.dart';
@@ -65,16 +66,25 @@ class _InvitationsListScreenState extends State<InvitationsListScreen> {
                       subtitle: Text(item.eventDate != null
                           ? '${item.eventDate!.toLocal().toString().split(' ')[0]} ${item.eventTime ?? ''}'
                           : 'Draft'),
-                      trailing: IconButton(
-                        icon: const Icon(Icons.share),
-                        onPressed: () async {
+                      trailing: PopupMenuButton<String>(
+                        onSelected: (value) async {
                           final url = 'https://saralevents.vercel.app/invite/${item.slug}';
-                          await Clipboard.setData(ClipboardData(text: url));
-                          if (!mounted) return;
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(content: Text('Link copied: $url')),
-                          );
+                          if (value == 'preview') {
+                            _openPreview(item);
+                          } else if (value == 'copy') {
+                            await Clipboard.setData(ClipboardData(text: url));
+                            if (!mounted) return;
+                            ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Link copied: $url')));
+                          } else if (value == 'open') {
+                            await launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication);
+                          }
                         },
+                        itemBuilder: (context) => const [
+                          PopupMenuItem(value: 'preview', child: Text('Preview in app')),
+                          PopupMenuItem(value: 'open', child: Text('Open invite link')),
+                          PopupMenuItem(value: 'copy', child: Text('Copy invite link')),
+                        ],
+                        icon: const Icon(Icons.more_vert),
                       ),
                       onTap: () => _openPreview(item),
                     );

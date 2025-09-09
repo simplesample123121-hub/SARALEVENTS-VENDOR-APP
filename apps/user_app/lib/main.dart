@@ -5,6 +5,7 @@ import 'core/supabase/supabase_config.dart';
 import 'core/session.dart';
 import 'core/router.dart';
 import 'core/theme/app_theme.dart';
+import 'screens/app_link_handler.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -26,11 +27,13 @@ class UserApp extends StatelessWidget {
       create: (_) => UserSession(),
       child: Consumer<UserSession>(
         builder: (context, session, _) {
-          return MaterialApp.router(
-            title: 'Saral Events User',
-            debugShowCheckedModeBanner: false,
-            theme: AppTheme.lightTheme,
-            routerConfig: AppRouter.create(session),
+          return AppLinkHandler(
+            child: MaterialApp.router(
+              title: 'Saral Events User',
+              debugShowCheckedModeBanner: false,
+              theme: AppTheme.lightTheme,
+              routerConfig: AppRouter.create(session),
+            ),
           );
         },
       ),

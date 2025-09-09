@@ -1,5 +1,6 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
     <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.QUERY_ALL_PACKAGES" />
     <application
         android:label="saral_events_user_app"
         android:name="${applicationName}"
@@ -26,7 +27,7 @@
                 <action android:name="android.intent.action.MAIN"/>
                 <category android:name="android.intent.category.LAUNCHER"/>
             </intent-filter>
-            <!-- App Links for invitations: https://YOUR_DOMAIN/invite/:slug -->
+            <!-- App Links for invitations: https://saralevents.vercel.app/invite/:slug -->
             <intent-filter android:autoVerify="true">
                 <action android:name="android.intent.action.VIEW" />
                 <category android:name="android.intent.category.DEFAULT" />
@@ -34,6 +35,20 @@
                 <data android:scheme="https"
                       android:host="saralevents.vercel.app"
                       android:pathPrefix="/invite" />
+            </intent-filter>
+            <!-- Handle app links from other apps -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="https" android:host="saralevents.vercel.app" android:pathPrefix="/invite" />
+            </intent-filter>
+            <!-- Custom scheme for direct app opening -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="saralevents" android:host="invite" />
             </intent-filter>
         </activity>
         <!-- Don't delete the meta-data below.
