@@ -10,8 +10,10 @@ import '../screens/forgot_password_screen.dart';
 import '../screens/reset_password_screen.dart';
 import '../screens/role_mismatch_screen.dart';
 import '../screens/debug_screen.dart';
-import '../screens/catalog_screen.dart';
 import '../screens/main_navigation_scaffold.dart';
+import '../screens/invitations_list_screen.dart';
+import '../screens/invitation_editor_screen.dart';
+import '../screens/invitation_preview_screen.dart';
 
 
 class AppRouter {
@@ -67,6 +69,17 @@ class AppRouter {
         GoRoute(path: '/auth/role-mismatch', builder: (_, __) => const RoleMismatchScreen()),
         GoRoute(path: '/debug', builder: (_, __) => const DebugScreen()),
         GoRoute(path: '/app', builder: (_, __) => const MainNavigationScaffold()),
+        GoRoute(path: '/invites', builder: (_, __) => const InvitationsListScreen()),
+        GoRoute(path: '/invites/new', builder: (_, __) => const InvitationEditorScreen()),
+        GoRoute(
+          path: '/invites/:slug',
+          builder: (ctx, st) => InvitationPreviewScreen(slug: st.pathParameters['slug']!),
+        ),
+        // Support app-links from web path `/invite/:slug`
+        GoRoute(
+          path: '/invite/:slug',
+          builder: (ctx, st) => InvitationPreviewScreen(slug: st.pathParameters['slug']!),
+        ),
       ],
     );
   }

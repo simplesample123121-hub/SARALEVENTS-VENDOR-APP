@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:go_router/go_router.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../core/session.dart';
 import '../services/profile_service.dart';
@@ -13,7 +14,7 @@ class ProfileScreen extends StatefulWidget {
 }
 
 class _ProfileScreenState extends State<ProfileScreen> {
-  final _formKey = GlobalKey<FormState>();
+  // Form key unused in this screen
   late final ProfileService _profileService;
   Map<String, dynamic>? _profile;
   bool _loading = true;
@@ -41,20 +42,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
     if (mounted) setState(() => _loading = false);
   }
 
-  Future<void> _save() async {
-    if (!_formKey.currentState!.validate()) return;
-    final user = context.read<UserSession>().currentUser;
-    if (user == null) return;
-    setState(() => _loading = true);
-    await _profileService.upsertProfile(
-      userId: user.id,
-      email: user.email ?? '',
-      firstName: _firstNameController.text.trim(),
-      lastName: _lastNameController.text.trim(),
-      phoneNumber: _phoneController.text.trim().isEmpty ? null : _phoneController.text.trim(),
-    );
-    await _load();
-  }
+  // Save handled in ProfileDetailsScreen
 
   @override
   void dispose() {
@@ -75,6 +63,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
           : ListView(
               padding: const EdgeInsets.all(16),
               children: [
+                ListTile(
+                  leading: const Icon(Icons.card_giftcard),
+                  title: const Text('My E-Invitations'),
+                  trailing: const Icon(Icons.chevron_right),
+                  onTap: () => GoRouter.of(context).push('/invites'),
+                ),
+                const Divider(),
                 Center(
                   child: Builder(builder: (context) {
                     final authMeta = user?.userMetadata ?? {};

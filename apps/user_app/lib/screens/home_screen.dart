@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:go_router/go_router.dart';
 import '../core/session.dart';
 import '../core/ui/image_utils.dart';
 import '../models/service_models.dart';
@@ -173,6 +174,35 @@ class _HomeScreenState extends State<HomeScreen> {
               
               // Categories section
               _buildCategoriesSection(),
+              const SizedBox(height: 24),
+
+              // Quick create invitation CTA
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 20),
+                child: GestureDetector(
+                  onTap: () => GoRouter.of(context).push('/invites'),
+                  child: Container(
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFFDBB42).withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Row(
+                      children: const [
+                        Icon(Icons.card_giftcard, color: Color(0xFFFDBB42)),
+                        SizedBox(width: 12),
+                        Expanded(
+                          child: Text(
+                            'Create an E-Invitation for your event',
+                            style: TextStyle(fontWeight: FontWeight.w600),
+                          ),
+                        ),
+                        Icon(Icons.arrow_forward_ios, size: 14),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
               const SizedBox(height: 24),
               
               // Events section
