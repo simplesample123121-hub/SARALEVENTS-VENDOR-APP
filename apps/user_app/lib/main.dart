@@ -27,13 +27,12 @@ class UserApp extends StatelessWidget {
       create: (_) => UserSession(),
       child: Consumer<UserSession>(
         builder: (context, session, _) {
-          return AppLinkHandler(
-            child: MaterialApp.router(
-              title: 'Saral Events User',
-              debugShowCheckedModeBanner: false,
-              theme: AppTheme.lightTheme,
-              routerConfig: AppRouter.create(session),
-            ),
+          return MaterialApp.router(
+            title: 'Saral Events User',
+            debugShowCheckedModeBanner: false,
+            theme: AppTheme.lightTheme,
+            routerConfig: AppRouter.create(session),
+            builder: (context, child) => AppLinkHandler(child: child ?? const SizedBox.shrink()),
           );
         },
       ),

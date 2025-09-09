@@ -74,7 +74,7 @@ class _InvitationPreviewScreenState extends State<InvitationPreviewScreen> {
                       label: const Text('RSVP Yes'),
                     ),
                     const SizedBox(height: 8),
-                    Text('Share link: https://saral-events.com/invite/${_item!.slug}', style: TextStyle(color: Colors.grey.shade700)),
+                    Text('Share link: https://saralevents.vercel.app/invite/${_item!.slug}', style: TextStyle(color: Colors.grey.shade700)),
                   ],
                 ),
     );

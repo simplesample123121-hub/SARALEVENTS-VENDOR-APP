@@ -21,6 +21,23 @@ class AppRouter {
     return GoRouter(
       initialLocation: '/',
       refreshListenable: session,
+      // Sanitize platform-provided deep-link locations
+      redirect: (ctx, state) {
+        final uri = state.uri;
+        // Custom scheme: saralevents://invite/:slug
+        if (uri.scheme == 'saralevents' && uri.host == 'invite') {
+          final slug = uri.path.startsWith('/') ? uri.path.substring(1) : uri.path;
+          if (slug.isNotEmpty) return '/invite/$slug';
+          return '/';
+        }
+        // HTTPS app link: https://saralevents.vercel.app/invite/:slug
+        if (uri.scheme == 'https' && uri.host == 'saralevents.vercel.app' && uri.path.startsWith('/invite/')) {
+          final slug = uri.path.substring('/invite/'.length);
+          if (slug.isNotEmpty) return '/invite/$slug';
+          return '/';
+        }
+        return null;
+      },
       routes: [
         GoRoute(
           path: '/',
