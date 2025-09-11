@@ -4,6 +4,7 @@ import 'package:cached_network_image/cached_network_image.dart';
 import '../models/service_models.dart';
 import '../services/service_service.dart';
 import 'booking_screen.dart';
+import '../widgets/wishlist_button.dart';
 
 class ServiceDetailsScreen extends StatefulWidget {
   final ServiceItem service;
@@ -55,7 +56,12 @@ class _ServiceDetailsScreenState extends State<ServiceDetailsScreen> {
             pinned: true,
             expandedHeight: 260,
             leading: IconButton(icon: const Icon(Icons.arrow_back), onPressed: () => Navigator.maybePop(context)),
-            actions: [IconButton(onPressed: () {}, icon: const Icon(Icons.favorite_border))],
+            actions: [
+              Padding(
+                padding: const EdgeInsets.only(right: 12),
+                child: WishlistButton(serviceId: svc.id, size: 38),
+              ),
+            ],
             flexibleSpace: FlexibleSpaceBar(
               background: imageUrl != null
                   ? CachedNetworkImage(imageUrl: Uri.encodeFull(imageUrl), fit: BoxFit.cover)
