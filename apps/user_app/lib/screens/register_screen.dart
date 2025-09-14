@@ -43,67 +43,67 @@ class _RegisterScreenState extends State<RegisterScreen> {
             phoneNumber: _phoneController.text.trim().isEmpty ? null : _phoneController.text.trim(),
           );
       if (!mounted) return;
-             if (requiresEmailConfirm) {
-         // Show dialog with login instructions
-         if (mounted) {
-           showDialog(
-             context: context,
-             barrierDismissible: false,
-             builder: (context) => AlertDialog(
-               title: const Text('Registration Successful!'),
-               content: Column(
-                 mainAxisSize: MainAxisSize.min,
-                 crossAxisAlignment: CrossAxisAlignment.start,
-                 children: [
-                   const Text('Your account has been created successfully.'),
-                   const SizedBox(height: 16),
-                   const Text(
-                     'Important: You will receive a confirmation email.',
-                     style: TextStyle(fontWeight: FontWeight.bold),
-                   ),
-                   const SizedBox(height: 8),
-                   const Text(
-                     'Please check your email for the confirmation link. After confirming, you can login with your email address.',
-                     style: TextStyle(fontSize: 12, color: Colors.grey),
-                   ),
-                 ],
-               ),
-               actions: [
-                 TextButton(
-                   onPressed: () {
-                     Navigator.of(context).pop();
-                     context.go('/auth/login');
-                   },
-                   child: const Text('OK'),
-                 ),
-               ],
-             ),
-           );
-         }
+      if (requiresEmailConfirm) {
+        // Show dialog with login instructions
+        if (mounted) {
+          showDialog(
+            context: context,
+            barrierDismissible: false,
+            builder: (context) => AlertDialog(
+              title: const Text('Registration Successful!'),
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: const [
+                  Text('Your account has been created successfully.'),
+                  SizedBox(height: 16),
+                  Text('Important: You will receive a confirmation email.', style: TextStyle(fontWeight: FontWeight.bold)),
+                  SizedBox(height: 8),
+                  Text('Please check your email for the confirmation link. After confirming, you can login with your email address.', style: TextStyle(fontSize: 12, color: Colors.grey)),
+                ],
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () {
+                    Navigator.of(context).pop();
+                    context.go('/auth/login?from=verify');
+                  },
+                  child: const Text('Open email app'),
+                ),
+                TextButton(
+                  onPressed: () {
+                    Navigator.of(context).pop();
+                    context.go('/auth/login?from=verify');
+                  },
+                  child: const Text('OK'),
+                ),
+              ],
+            ),
+          );
+        }
       } else {
         context.go('/');
       }
     } catch (e) {
       if (!mounted) return;
-      
-             // Check for specific error types
-       if (e.toString().contains('already exists') || e.toString().contains('registered as')) {
-         ScaffoldMessenger.of(context).showSnackBar(
-           SnackBar(
-             content: Text(e.toString().replaceAll('Exception: ', '')),
-             backgroundColor: Colors.orange,
-             duration: const Duration(seconds: 4),
-           ),
-         );
-         // Navigate to login after showing message
-         Future.delayed(const Duration(seconds: 2), () {
-           if (mounted) {
-             context.go('/auth/login');
-           }
-         });
-       } else {
-         ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Registration failed: $e')));
-       }
+      // Check for specific error types
+      if (e.toString().contains('already exists') || e.toString().contains('registered as')) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(e.toString().replaceAll('Exception: ', '')),
+            backgroundColor: Colors.orange,
+            duration: const Duration(seconds: 4),
+          ),
+        );
+        // Navigate to login after showing message
+        Future.delayed(const Duration(seconds: 2), () {
+          if (mounted) {
+            context.go('/auth/login');
+          }
+        });
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Registration failed: $e')));
+      }
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }

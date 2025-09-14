@@ -7,6 +7,7 @@ class UserSession extends ChangeNotifier {
   bool _isAuthenticated = false;
   bool _isPasswordRecovery = false;
   String? _userRole;
+  bool _isProfileSetupComplete = false;
 
   UserSession() {
     Supabase.instance.client.auth.onAuthStateChange.listen((event) async {
@@ -16,6 +17,7 @@ class UserSession extends ChangeNotifier {
       }
       if (_isAuthenticated) {
         await _checkUserRole();
+        await checkProfileSetup();
       }
       notifyListeners();
     });
@@ -26,6 +28,7 @@ class UserSession extends ChangeNotifier {
     _isAuthenticated = Supabase.instance.client.auth.currentSession != null;
     if (_isAuthenticated) {
       await _checkUserRole();
+      await checkProfileSetup();
     }
     notifyListeners();
   }
@@ -37,6 +40,7 @@ class UserSession extends ChangeNotifier {
   bool get isUserRole => _userRole == 'user';
   bool get isVendorRole => _userRole == 'vendor';
   bool get isCompanyRole => _userRole == 'company';
+  bool get isProfileSetupComplete => _isProfileSetupComplete;
   
   User? get currentUser => Supabase.instance.client.auth.currentUser;
 
@@ -83,6 +87,7 @@ class UserSession extends ChangeNotifier {
       _isAuthenticated = res.session != null;
       if (_isAuthenticated) {
         await _checkUserRole();
+        await checkProfileSetup();
       }
     } catch (e) {
       print('Login error: $e');
@@ -121,6 +126,7 @@ class UserSession extends ChangeNotifier {
 			_isAuthenticated = res.session != null || Supabase.instance.client.auth.currentSession != null;
 			if (_isAuthenticated) {
 				await _checkUserRole();
+        await checkProfileSetup();
 			}
 			notifyListeners();
 		} catch (e) {
@@ -143,6 +149,9 @@ class UserSession extends ChangeNotifier {
         final res = await Supabase.instance.client.auth.signUp(
           email: email,
           password: password,
+          emailRedirectTo: kIsWeb
+              ? null
+              : 'saralevents://auth/confirm',
         );
         
         print('Auth signup result: ${res.user?.id}');
@@ -158,19 +167,19 @@ class UserSession extends ChangeNotifier {
             'role': 'user',
           });
           
-          // Create user profile
-          print('Creating user profile for: ${res.user!.id}');
-          final profileResult = await Supabase.instance.client.from('user_profiles').upsert({
+          // Create legacy user profile placeholder (optional)
+          print('Creating user profile placeholder (legacy table) for: ${res.user!.id}');
+          await Supabase.instance.client.from('user_profiles').upsert({
             'user_id': res.user!.id,
             'first_name': firstName,
             'last_name': lastName,
             'phone_number': phoneNumber,
             'email': email,
           });
-          print('Profile creation result: $profileResult');
           
           _isAuthenticated = res.session != null;
           _userRole = 'user';
+          await checkProfileSetup();
           print('New user registration successful!');
         }
         
@@ -189,29 +198,29 @@ class UserSession extends ChangeNotifier {
               .eq('email', email)
               .maybeSingle();
           
-                     if (existingProfile != null) {
-             // Check existing roles
-             final existingRoles = await Supabase.instance.client
-                 .from('user_roles')
-                 .select('role')
-                 .eq('user_id', existingProfile['user_id']);
-             
-             List<String> currentRoles = [];
-             if (existingRoles.isNotEmpty) {
-               currentRoles = existingRoles.map((r) => r['role'] as String).toList();
-             }
-             
-             // Show appropriate message based on existing roles
-             if (currentRoles.contains('user')) {
-               throw Exception('Account already exists. Please login instead.');
-             } else {
-               final otherRoles = currentRoles.join(', ');
-               throw Exception('This email is registered as $otherRoles. Please login with your existing credentials.');
-             }
-           } else {
-             // If no profile found, just show the error
-             throw Exception('Account already exists. Please login instead.');
-           }
+                 if (existingProfile != null) {
+            // Check existing roles
+            final existingRoles = await Supabase.instance.client
+                .from('user_roles')
+                .select('role')
+                .eq('user_id', existingProfile['user_id']);
+            
+            List<String> currentRoles = [];
+            if (existingRoles.isNotEmpty) {
+              currentRoles = existingRoles.map((r) => r['role'] as String).toList();
+            }
+            
+            // Show appropriate message based on existing roles
+            if (currentRoles.contains('user')) {
+              throw Exception('Account already exists. Please login instead.');
+            } else {
+              final otherRoles = currentRoles.join(', ');
+              throw Exception('This email is registered as $otherRoles. Please login with your existing credentials.');
+            }
+          } else {
+            // If no profile found, just show the error
+            throw Exception('Account already exists. Please login instead.');
+          }
         }
         
         // Re-throw the original error
@@ -229,6 +238,7 @@ class UserSession extends ChangeNotifier {
     await Supabase.instance.client.auth.signOut();
     _isAuthenticated = false;
     _userRole = null;
+    _isProfileSetupComplete = false;
     notifyListeners();
   }
 
@@ -257,6 +267,32 @@ class UserSession extends ChangeNotifier {
         return 'This account is registered as a company. You can still use the user app.';
       default:
         return 'This account has an invalid role.';
+    }
+  }
+
+  // Determine whether minimum profile info exists
+  Future<void> checkProfileSetup() async {
+    try {
+      final user = Supabase.instance.client.auth.currentUser;
+      if (user == null) {
+        _isProfileSetupComplete = false;
+        return;
+      }
+      // Use 'user_profiles' table (current schema)
+      final profile = await Supabase.instance.client
+          .from('user_profiles')
+          .select('first_name, phone_number')
+          .eq('user_id', user.id)
+          .maybeSingle();
+
+      final firstName = (profile?['first_name'] as String?)?.trim();
+      final phone = (profile?['phone_number'] as String?)?.trim();
+
+      // Require both first_name and phone_number to be present
+      _isProfileSetupComplete =
+          (firstName != null && firstName.isNotEmpty) && (phone != null && phone.isNotEmpty);
+    } catch (_) {
+      _isProfileSetupComplete = false;
     }
   }
 }

@@ -1,0 +1,18 @@
+								1.  logo
+								1.1 onborading screen images
+								1.2 remove continue as guest
+								1.4 ask for user details like name etc after registering (show same name in app)
+								1.3 Location before entering into homepage
+								1.4 Banner functionality (multiple) (through company app)
+1.5 featured events cards in good shape
+1.6 categorize by events (homepage)
+1.7 remove that serach filed border in category search page
+2. service details page
+3. review system
+4. vendors details page
+5. Search page
+6. Event planning flow
+7. Notifications page and functionality
+8. add to cart flow  
+9. payment gateway integration
+10. E invitation page upgraddes and ui improvements

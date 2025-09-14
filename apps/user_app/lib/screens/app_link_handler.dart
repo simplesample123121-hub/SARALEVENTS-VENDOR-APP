@@ -50,6 +50,17 @@ class _AppLinkHandlerState extends State<AppLinkHandler> {
     final uri = Uri.parse(link);
     print('🔗 Parsed URI: scheme=${uri.scheme}, host=${uri.host}, path=${uri.path}');
     
+    // Email confirmation: saralevents://auth/confirm or https://<site>/auth/confirm
+    if ((uri.scheme == 'saralevents' && uri.host == 'auth' && uri.path.startsWith('/confirm')) ||
+        (uri.scheme == 'https' && uri.path.startsWith('/auth/confirm'))) {
+      Future.delayed(const Duration(milliseconds: 400), () {
+        if (mounted) {
+          context.go('/auth/setup');
+        }
+      });
+      return;
+    }
+
     // Handle custom scheme: saralevents://invite/{slug}
     if (uri.scheme == 'saralevents' && uri.host == 'invite') {
       // For saralevents://invite/abc-2865, the path is "/abc-2865"

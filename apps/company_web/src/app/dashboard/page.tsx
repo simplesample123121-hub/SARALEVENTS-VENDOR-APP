@@ -28,6 +28,7 @@ export default function Dashboard() {
           <Card title="Services" href="/dashboard/services" subtitle="All catalog services" />
           <Card title="Vendors" href="/dashboard/vendors" subtitle="Vendor profiles and status" />
           <Card title="Users" href="/dashboard/users" subtitle="User profiles and activity" />
+          <Card title="Banners" href="/dashboard/banners" subtitle="Manage user app banners" />
         </div>
       </div>
     </main>

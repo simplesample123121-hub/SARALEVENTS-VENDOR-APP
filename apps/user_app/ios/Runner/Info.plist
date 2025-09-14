@@ -45,6 +45,8 @@
 	<true/>
 	<key>UIApplicationSupportsIndirectInputEvents</key>
 	<true/>
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>Your location helps us show nearby services and addresses.</string>
 	<key>CFBundleURLTypes</key>
 	<array>
 		<dict>

@@ -20,26 +20,26 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
     // Precache onboarding assets once
     WidgetsBinding.instance.addPostFrameCallback((_) {
       AppImages.precacheAssets(context, const [
-        'assets/onboarding/onboarding_1.png',
-        'assets/onboarding/onboarding_2.png',
-        'assets/onboarding/onboarding_3.png',
+        'assets/onboarding/onboarding_1.jpg',
+        'assets/onboarding/onboarding_2.jpg',
+        'assets/onboarding/onboarding_3.jpg',
       ]);
     });
     final pages = [
       _OnboardPage(
         title: 'Find Amazing Services',
         subtitle: 'Discover event vendors and services for all your special occasions.',
-        imagePath: 'assets/onboarding/onboarding_1.png',
+        imagePath: 'assets/onboarding/onboarding_1.jpg',
       ),
       _OnboardPage(
         title: 'Compare & Choose',
         subtitle: 'Browse services, compare prices and read reviews to make the best choice.',
-        imagePath: 'assets/onboarding/onboarding_2.png',
+        imagePath: 'assets/onboarding/onboarding_2.jpg',
       ),
       _OnboardPage(
         title: 'Book with Ease',
         subtitle: 'Connect directly with vendors and book your perfect event services.',
-        imagePath: 'assets/onboarding/onboarding_3.png',
+        imagePath: 'assets/onboarding/onboarding_3.jpg',
       ),
     ];
 

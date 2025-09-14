@@ -9,11 +9,15 @@ import '../screens/register_screen.dart';
 import '../screens/forgot_password_screen.dart';
 import '../screens/reset_password_screen.dart';
 import '../screens/role_mismatch_screen.dart';
+import '../screens/account_setup_screen.dart';
 import '../screens/debug_screen.dart';
 import '../screens/main_navigation_scaffold.dart';
 import '../screens/invitations_list_screen.dart';
 import '../screens/invitation_editor_screen.dart';
 import '../screens/invitation_preview_screen.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import '../screens/select_location_screen.dart';
+import '../screens/map_location_picker.dart';
 
 
 class AppRouter {
@@ -24,6 +28,12 @@ class AppRouter {
       // Sanitize platform-provided deep-link locations
       redirect: (ctx, state) {
         final uri = state.uri;
+        // Handle auth email confirmation deep link: saralevents://auth/confirm
+        if (uri.scheme == 'saralevents' && uri.host == 'auth' && uri.path.startsWith('/confirm')) {
+          final s = Provider.of<UserSession>(ctx, listen: false);
+          // If already logged in, proceed to setup (profile completion). Otherwise go to login.
+          return s.isAuthenticated ? '/auth/setup' : '/auth/login?verified=1';
+        }
         // Custom scheme: saralevents://invite/:slug
         if (uri.scheme == 'saralevents' && uri.host == 'invite') {
           final slug = uri.path.startsWith('/') ? uri.path.substring(1) : uri.path;
@@ -44,13 +54,33 @@ class AppRouter {
           redirect: (ctx, state) {
             final s = Provider.of<UserSession>(ctx, listen: false);
             if (s.isPasswordRecovery) return '/auth/reset';
-            // If authenticated, always go to the app home
-            if (s.isAuthenticated) return '/app';
+            // If authenticated, check setup then location
+            if (s.isAuthenticated) {
+              if (!s.isProfileSetupComplete) return '/auth/setup';
+              return '/location/check';
+            }
             // Only show onboarding for unauthenticated users who haven't completed it
             if (!s.isOnboardingComplete) return '/onboarding';
             return '/auth/pre';
           },
           builder: (ctx, st) => const SizedBox.shrink(),
+        ),
+        GoRoute(
+          path: '/location/check',
+          redirect: (ctx, st) async {
+            final prefs = await SharedPreferences.getInstance();
+            final has = prefs.containsKey('loc_lat') && prefs.containsKey('loc_lng');
+            return has ? '/app' : '/location/select';
+          },
+          builder: (_, __) => const SizedBox.shrink(),
+        ),
+        GoRoute(
+          path: '/location/select',
+          builder: (_, __) => const SelectLocationScreen(),
+        ),
+        GoRoute(
+          path: '/location/map',
+          builder: (_, __) => const MapLocationPicker(),
         ),
         GoRoute(
           path: '/onboarding',
@@ -68,13 +98,20 @@ class AppRouter {
           builder: (_, __) => const PreAuthScreen(),
         ),
         GoRoute(
+          path: '/auth/setup',
+          builder: (_, __) => const AccountSetupScreen(),
+        ),
+        GoRoute(
           path: '/auth/login',
           redirect: (ctx, state) {
             final s = Provider.of<UserSession>(ctx, listen: false);
             if (s.isPasswordRecovery) return '/auth/reset';
             return null;
           },
-          builder: (_, __) => const LoginScreen(),
+          builder: (_, st) => LoginScreen(
+            showVerifiedPrompt: st.uri.queryParameters['verified'] == '1' ||
+                st.uri.queryParameters['from'] == 'verify',
+          ),
         ),
         GoRoute(
           path: '/auth/register',

@@ -14,9 +14,9 @@ class ProfileService {
       const Duration(minutes: 5),
       () async {
         final res = await _supabase
-            .from('profiles')
+            .from('user_profiles')
             .select('*')
-            .eq('id', userId)
+            .eq('user_id', userId)
             .maybeSingle();
         return res;
       },
@@ -32,7 +32,7 @@ class ProfileService {
     String? imageUrl,
   }) async {
     final data = {
-      'id': userId,
+      'user_id': userId,
       'email': email,
       'first_name': firstName,
       'last_name': lastName,
@@ -41,8 +41,8 @@ class ProfileService {
       'updated_at': DateTime.now().toIso8601String(),
     };
     await _supabase
-        .from('profiles')
-        .upsert(data, onConflict: 'id');
+        .from('user_profiles')
+        .upsert(data, onConflict: 'user_id');
     CacheManager.instance.invalidate('profile:$userId');
     return true;
   }
@@ -62,9 +62,9 @@ class ProfileService {
   // Wishlist APIs
   Future<List<String>> getWishlistServiceIds(String userId) async {
     final res = await _supabase
-        .from('profiles')
+        .from('user_profiles')
         .select('wishlist')
-        .eq('id', userId)
+        .eq('user_id', userId)
         .maybeSingle();
     final wish = (res != null && res['wishlist'] is List)
         ? List<String>.from(res['wishlist'].map((e) => e.toString()))
@@ -88,9 +88,9 @@ class ProfileService {
 
     // Update in DB
     await _supabase
-        .from('profiles')
+        .from('user_profiles')
         .update({'wishlist': updated})
-        .eq('id', userId);
+        .eq('user_id', userId);
 
     // Invalidate cached profile
     CacheManager.instance.invalidate('profile:$userId');

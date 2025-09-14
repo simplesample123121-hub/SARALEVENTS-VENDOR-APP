@@ -1,13 +1,22 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:go_router/go_router.dart';
 import '../core/session.dart';
 import '../core/ui/image_utils.dart';
+import '../core/services/address_storage.dart';
+import '../core/utils/address_utils.dart';
 import '../models/service_models.dart';
 import 'catalog_screen.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../services/profile_service.dart';
 import '../widgets/wishlist_button.dart';
+import '../widgets/banner_widget.dart';
+import '../widgets/banner_debug_widget.dart';
+import '../widgets/featured_events_section.dart';
+import '../services/banner_service.dart';
+import '../services/featured_services_service.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -16,7 +25,7 @@ class HomeScreen extends StatefulWidget {
   State<HomeScreen> createState() => _HomeScreenState();
 }
 
-class _HomeScreenState extends State<HomeScreen> {
+class _HomeScreenState extends State<HomeScreen> with RouteAware {
 
   // Static categories with asset mapping to match the provided UI
   final List<Map<String, String>> _categories = [
@@ -57,6 +66,7 @@ class _HomeScreenState extends State<HomeScreen> {
   VoidCallback? _sessionListener;
   UserSession? _sessionRef;
   String? _avatarUrl;
+  String? _activeAddress;
 
   @override
   void initState() {
@@ -69,7 +79,21 @@ class _HomeScreenState extends State<HomeScreen> {
         _categories.map((c) => c['asset']!).toList(),
       );
       _attachSessionListenerAndLoadName();
+      _loadActiveAddress();
     });
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    // Reload address when returning from location screen
+    _loadActiveAddress();
+  }
+
+  @override
+  void didPopNext() {
+    // Called when returning to this screen from another screen
+    _loadActiveAddress();
   }
 
   void _attachSessionListenerAndLoadName() {
@@ -77,6 +101,10 @@ class _HomeScreenState extends State<HomeScreen> {
     _sessionListener = () { _loadDisplayName(); };
     _sessionRef!.addListener(_sessionListener!);
     _loadDisplayName();
+    // Also listen for address changes when page resumes
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _loadActiveAddress();
+    });
   }
 
   Future<void> _loadDisplayName() async {
@@ -100,6 +128,28 @@ class _HomeScreenState extends State<HomeScreen> {
       _displayName = (full.isNotEmpty) ? full : (emailPrefix ?? 'User');
       _avatarUrl = (profile?['image_url'] as String?) ?? fallbackAvatar;
     });
+  }
+
+  Future<void> _loadActiveAddress() async {
+    try {
+      final activeAddress = await AddressStorage.getActive();
+      if (!mounted) return;
+      setState(() { 
+        _activeAddress = activeAddress != null 
+            ? AddressUtils.extractAreaName(activeAddress.address)
+            : 'Select location';
+      });
+    } catch (_) {
+      // Fallback to SharedPreferences if AddressStorage fails
+      final prefs = await SharedPreferences.getInstance();
+      final addr = prefs.getString('loc_address');
+      if (!mounted) return;
+      setState(() { 
+        _activeAddress = addr != null 
+            ? AddressUtils.extractAreaName(addr)
+            : 'Select location';
+      });
+    }
   }
 
   Future<void> _loadData() async {
@@ -206,8 +256,21 @@ class _HomeScreenState extends State<HomeScreen> {
               ),
               const SizedBox(height: 24),
               
-              // Events section
-              _buildEventsSection(),
+              // Enhanced Events section with real-time updates
+              FeaturedEventsSection(
+                onSeeAllTap: () {
+                  Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (context) => const CatalogScreen(),
+                    ),
+                  );
+                },
+                onServiceTap: (service) {
+                  // Navigate to service details
+                  debugPrint('Tapped on service: ${service.name}');
+                  // TODO: Navigate to service details screen
+                },
+              ),
               const SizedBox(height: 20),
             ],
           ),
@@ -274,26 +337,63 @@ class _HomeScreenState extends State<HomeScreen> {
                       ),
                     ),
                     const SizedBox(height: 2),
-                    Row(
-                      children: [
-                        Icon(
-                          Icons.location_on,
-                          size: 16,
-                          color: Colors.grey[600],
-                        ),
-                        const SizedBox(width: 4),
-                        Text(
-                          'Hyderabad',
-                          style: TextStyle(
-                            fontSize: 14,
+                    GestureDetector(
+                      onTap: () => GoRouter.of(context).push('/location/select'),
+                      behavior: HitTestBehavior.opaque,
+                      child: Row(
+                        children: [
+                          Icon(
+                            Icons.location_on,
+                            size: 16,
                             color: Colors.grey[600],
                           ),
-                        ),
-                      ],
+                          const SizedBox(width: 4),
+                          Expanded(
+                            child: Text(
+                              _activeAddress ?? 'Select location',
+                              style: TextStyle(
+                                fontSize: 14,
+                                color: Colors.grey[600],
+                              ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                          const SizedBox(width: 4),
+                          Icon(Icons.keyboard_arrow_down, size: 16, color: Colors.grey[600]),
+                        ],
+                      ),
                     ),
                   ],
                 ),
               ),
+              
+              // Debug button (only in debug mode)
+              if (kDebugMode)
+                GestureDetector(
+                  onTap: () {
+                    Navigator.of(context).push(
+                      MaterialPageRoute(
+                        builder: (context) => const BannerDebugWidget(),
+                      ),
+                    );
+                  },
+                  child: Container(
+                    width: 40,
+                    height: 40,
+                    decoration: BoxDecoration(
+                      color: Colors.blue[100],
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Icon(
+                      Icons.bug_report,
+                      color: Colors.blue[700],
+                      size: 20,
+                    ),
+                  ),
+                ),
+              
+              const SizedBox(width: 8),
               
               // Notification bell
               Container(
@@ -350,15 +450,13 @@ class _HomeScreenState extends State<HomeScreen> {
   Widget _buildHeroBanner() {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 20),
-      child: ClipRRect(
+      child: SmartBannerWidget(
+        aspectRatio: 16 / 9,
         borderRadius: BorderRadius.circular(16),
-        child: AspectRatio(
-          aspectRatio: 16 / 9,
-          child: Image.asset(
-            'assets/onboarding/onboarding_1.png',
-            fit: BoxFit.cover,
-          ),
-        ),
+        fit: BoxFit.cover,
+        fallbackAsset: 'assets/onboarding/onboarding_1.jpg',
+        autoPlay: true,
+        autoPlayDuration: const Duration(seconds: 4),
       ),
     );
   }
@@ -683,6 +781,9 @@ class _HomeScreenState extends State<HomeScreen> {
     if (_sessionListener != null) {
       _sessionRef?.removeListener(_sessionListener!);
     }
+    // Clean up subscriptions when leaving home screen
+    BannerService.stopBannerSubscription();
+    FeaturedServicesService.stopFeaturedServicesSubscription();
     super.dispose();
   }
 }

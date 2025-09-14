@@ -5,7 +5,8 @@ import 'package:flutter_svg/flutter_svg.dart';
 import '../core/session.dart';
 
 class LoginScreen extends StatefulWidget {
-  const LoginScreen({super.key});
+  final bool showVerifiedPrompt;
+  const LoginScreen({super.key, this.showVerifiedPrompt = false});
 
   @override
   State<LoginScreen> createState() => _LoginScreenState();
@@ -110,6 +111,21 @@ class _LoginScreenState extends State<LoginScreen> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
+                      if (widget.showVerifiedPrompt) ...[
+                        Container(
+                          padding: const EdgeInsets.all(12),
+                          margin: const EdgeInsets.only(bottom: 12),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFD1FAE5),
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(color: const Color(0xFF10B981)),
+                          ),
+                          child: const Text(
+                            'Email verified! Please log in to your new account.',
+                            style: TextStyle(color: Color(0xFF065F46), fontWeight: FontWeight.w600),
+                          ),
+                        ),
+                      ],
                       const SizedBox(height: 4),
                       TextFormField(
                         controller: _emailController,

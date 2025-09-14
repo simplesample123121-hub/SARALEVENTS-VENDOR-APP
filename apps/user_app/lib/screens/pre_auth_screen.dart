@@ -31,7 +31,7 @@ class PreAuthScreen extends StatelessWidget {
                     children: [
                       Expanded(
                         child: _RoundedImage(
-                          asset: 'assets/onboarding/onboarding_1.png',
+                          asset: 'assets/onboarding/Pre_auth_1.jpg',
                           height: 446,
                         ),
                       ),
@@ -39,9 +39,9 @@ class PreAuthScreen extends StatelessWidget {
                       Expanded(
                         child: Column(
                           children: const [
-                            _RoundedImage(asset: 'assets/onboarding/onboarding_2.png', height: 240),
+                            _RoundedImage(asset: 'assets/onboarding/Pre_auth_2.png', height: 240),
                             SizedBox(height: 16),
-                            _RoundedImage(asset: 'assets/onboarding/onboarding_3.png', height: 190),
+                            _RoundedImage(asset: 'assets/onboarding/Pre_auth_3.jpg', height: 190),
                           ],
                         ),
                       ),
@@ -91,6 +91,7 @@ class PreAuthScreen extends StatelessWidget {
                     ),
                   ),
                   const SizedBox(height: 36),
+                  /*
                   Center(
                     child: TextButton(
                       onPressed: () => context.go('/app'),
@@ -104,6 +105,7 @@ class PreAuthScreen extends StatelessWidget {
                       ),
                     ),
                   ),
+                  */
                   const SizedBox(height: 24),
                 ],
               ),
