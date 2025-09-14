@@ -90,12 +90,12 @@ BEGIN
         BLOCK "040904e4"
         BEGIN
             VALUE "CompanyName", "com.example" "\0"
-            VALUE "FileDescription", "saral_events_user_app" "\0"
+            VALUE "FileDescription", "Saral Events" "\0"
             VALUE "FileVersion", VERSION_AS_STRING "\0"
-            VALUE "InternalName", "saral_events_user_app" "\0"
+            VALUE "InternalName", "Saral Events" "\0"
             VALUE "LegalCopyright", "Copyright (C) 2025 com.example. All rights reserved." "\0"
-            VALUE "OriginalFilename", "saral_events_user_app.exe" "\0"
-            VALUE "ProductName", "saral_events_user_app" "\0"
+            VALUE "OriginalFilename", "Saral Events.exe" "\0"
+            VALUE "ProductName", "Saral Events" "\0"
             VALUE "ProductVersion", VERSION_AS_STRING "\0"
         END
     END

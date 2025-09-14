@@ -28,7 +28,7 @@ class UserApp extends StatelessWidget {
       child: Consumer<UserSession>(
         builder: (context, session, _) {
           return MaterialApp.router(
-            title: 'Saral Events User',
+            title: 'Saral Events',
             debugShowCheckedModeBanner: false,
             theme: AppTheme.lightTheme,
             routerConfig: AppRouter.create(session),
