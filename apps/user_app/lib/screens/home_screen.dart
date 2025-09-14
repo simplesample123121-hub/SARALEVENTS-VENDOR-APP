@@ -7,6 +7,7 @@ import '../models/service_models.dart';
 import 'catalog_screen.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../services/profile_service.dart';
+import '../widgets/wishlist_button.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -89,7 +90,7 @@ class _HomeScreenState extends State<HomeScreen> {
     final profile = await ProfileService(Supabase.instance.client).getProfile(user.id);
     final first = (profile?['first_name'] as String?)?.trim();
     final last = (profile?['last_name'] as String?)?.trim();
-    final full = [first, last].where((e) => e != null && e!.isNotEmpty).join(' ').trim();
+    final full = [first, last].where((e) => e != null && e.isNotEmpty).join(' ').trim();
     final dynamicMeta = user.userMetadata;
     final Map<String, dynamic> authMeta =
         (dynamicMeta is Map<String, dynamic>) ? dynamicMeta : const <String, dynamic>{};
@@ -565,7 +566,19 @@ class _HomeScreenState extends State<HomeScreen> {
                           itemCount: _featuredServices.length,
                           itemBuilder: (context, index) {
                             final service = _featuredServices[index];
-                            return _buildEventCard(service);
+                            return Padding(
+                              padding: const EdgeInsets.only(right: 16),
+                              child: Stack(
+                                children: [
+                                  _buildEventCard(service),
+                                  Positioned(
+                                    top: 8,
+                                    right: 8,
+                                    child: WishlistButton(serviceId: service.id, size: 34),
+                                  ),
+                                ],
+                              ),
+                            );
                           },
                         ),
         ),
@@ -576,7 +589,6 @@ class _HomeScreenState extends State<HomeScreen> {
   Widget _buildEventCard(ServiceItem service) {
     return Container(
       width: 140,
-      margin: const EdgeInsets.only(right: 16),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(12),

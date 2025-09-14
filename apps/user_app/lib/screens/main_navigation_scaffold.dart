@@ -1,10 +1,8 @@
 import 'package:flutter/material.dart';
-import 'package:go_router/go_router.dart';
-import 'package:provider/provider.dart';
-import '../core/session.dart';
 import 'home_screen.dart';
 import 'orders_screen.dart';
 import 'profile_screen.dart';
+import 'wishlist_screen.dart';
 
 class MainNavigationScaffold extends StatefulWidget {
   const MainNavigationScaffold({super.key});
@@ -19,6 +17,7 @@ class _MainNavigationScaffoldState extends State<MainNavigationScaffold> {
   final List<Widget> _tabs = const [
     HomeScreen(),
     OrdersScreen(),
+    WishlistScreen(),
     ProfileScreen(),
   ];
 
@@ -33,18 +32,23 @@ class _MainNavigationScaffoldState extends State<MainNavigationScaffold> {
         onTap: (index) => setState(() => _currentIndex = index),
         selectedLabelStyle: const TextStyle(fontWeight: FontWeight.w600, fontSize: 12),
         unselectedLabelStyle: const TextStyle(fontWeight: FontWeight.w400, fontSize: 12),
-        selectedItemColor: const Color(0xFFFDBB42), // Yellow color
+        selectedItemColor: const Color(0xFFFDBB42),
         unselectedItemColor: Colors.grey.shade600,
         items: const [
           BottomNavigationBarItem(
             icon: Icon(Icons.home),
-            activeIcon: Icon(Icons.home, color: Color(0xFFFDBB42)), // Yellow color
+            activeIcon: Icon(Icons.home, color: Color(0xFFFDBB42)),
             label: 'Home',
           ),
           BottomNavigationBarItem(
             icon: Icon(Icons.receipt_long),
-            activeIcon: Icon(Icons.receipt_long, color: Color(0xFFFDBB42)), // Yellow color
+            activeIcon: Icon(Icons.receipt_long, color: Color(0xFFFDBB42)),
             label: 'My Orders',
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.favorite_border),
+            activeIcon: Icon(Icons.favorite, color: Color(0xFFFDBB42)),
+            label: 'Wishlist',
           ),
           BottomNavigationBarItem(
             icon: Icon(Icons.person),

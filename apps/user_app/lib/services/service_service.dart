@@ -198,4 +198,54 @@ class ServiceService {
       return [];
     }
   }
+
+  // Fetch services by a list of IDs
+  Future<List<ServiceItem>> getServicesByIds(List<String> ids) async {
+    if (ids.isEmpty) return <ServiceItem>[];
+    try {
+      final result = await _supabase
+          .from('services')
+          .select('''
+            *,
+            vendor_profiles!inner(
+              id,
+              business_name,
+              address,
+              category
+            )
+          ''')
+          .inFilter('id', ids)
+          .eq('is_active', true)
+          .order('created_at', ascending: false);
+      return result.map((row) {
+        final vendorProfile = row['vendor_profiles'];
+        return ServiceItem(
+          id: row['id'],
+          categoryId: row['category_id'],
+          name: row['name'],
+          price: (row['price'] ?? 0).toDouble(),
+          tags: List<String>.from(row['tags'] ?? []),
+          description: row['description'] ?? '',
+          media: (row['media_urls'] as List<dynamic>?)
+                  ?.map((url) => MediaItem(url: url, type: MediaType.image))
+                  .toList() ??
+              [],
+          enabled: row['is_active'] ?? true,
+          vendorId: vendorProfile['id'] ?? '',
+          vendorName: vendorProfile['business_name'] ?? 'Unknown Vendor',
+          capacityMin: row['capacity_min'] as int?,
+          capacityMax: row['capacity_max'] as int?,
+          parkingSpaces: row['parking_spaces'] as int?,
+          ratingAvg: (row['rating_avg'] is num) ? (row['rating_avg'] as num).toDouble() : null,
+          ratingCount: row['rating_count'] as int?,
+          suitedFor: List<String>.from(row['suited_for'] ?? const <String>[]),
+          features: (row['features'] as Map<String, dynamic>?) ?? const <String, dynamic>{},
+          policies: List<String>.from(row['policies'] ?? const <String>[]),
+        );
+      }).toList();
+    } catch (e) {
+      print('Error fetching services by ids: $e');
+      return [];
+    }
+  }
 }

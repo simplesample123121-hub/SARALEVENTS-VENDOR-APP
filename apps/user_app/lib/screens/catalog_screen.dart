@@ -4,7 +4,7 @@ import 'package:cached_network_image/cached_network_image.dart';
 import '../models/service_models.dart';
 import '../services/service_service.dart';
 import 'service_details_screen.dart';
-import '../core/cache/simple_cache.dart';
+import '../widgets/wishlist_button.dart';
 
 
 class CatalogScreen extends StatefulWidget {
@@ -418,65 +418,76 @@ class _CatalogScreenState extends State<CatalogScreen> {
    }
 
   Widget _buildGridServiceCard(BuildContext context, ServiceItem service) {
-    return InkWell(
-      onTap: () {
-        Navigator.of(context).push(
-          MaterialPageRoute(builder: (_) => ServiceDetailsScreen(service: service)),
-        );
-      },
-      child: Container(
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(16),
-          boxShadow: [
-            BoxShadow(color: Colors.black.withOpacity(0.06), blurRadius: 12, offset: const Offset(0, 6)),
-          ],
-          border: Border.all(color: Colors.black.withOpacity(0.06)),
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            ClipRRect(
-              borderRadius: const BorderRadius.only(topLeft: Radius.circular(16), topRight: Radius.circular(16)),
-              child: AspectRatio(
-                aspectRatio: 16 / 12,
-                child: (service.media.isNotEmpty)
-                    ? CachedNetworkImage(
-                        imageUrl: Uri.encodeFull(service.media.first.url),
-                        fit: BoxFit.cover,
-                        placeholder: (c, _) => Container(color: Colors.black12.withOpacity(0.06)),
-                        errorWidget: (c, _, __) => Container(color: Colors.black12.withOpacity(0.06)),
-                      )
-                    : Container(color: Colors.black12.withOpacity(0.06)),
+    return Stack(
+      children: [
+        Positioned.fill(
+          child: InkWell(
+            onTap: () {
+              Navigator.of(context).push(
+                MaterialPageRoute(builder: (_) => ServiceDetailsScreen(service: service)),
+              );
+            },
+            child: Container(
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(16),
+                boxShadow: [
+                  BoxShadow(color: Colors.black.withOpacity(0.06), blurRadius: 12, offset: const Offset(0, 6)),
+                ],
+                border: Border.all(color: Colors.black.withOpacity(0.06)),
               ),
-            ),
-            Padding(
-              padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(
-                    service.name,
-                    style: const TextStyle(fontWeight: FontWeight.w700),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
+                  ClipRRect(
+                    borderRadius: const BorderRadius.only(topLeft: Radius.circular(16), topRight: Radius.circular(16)),
+                    child: AspectRatio(
+                      aspectRatio: 16 / 12,
+                      child: (service.media.isNotEmpty)
+                          ? CachedNetworkImage(
+                              imageUrl: Uri.encodeFull(service.media.first.url),
+                              fit: BoxFit.cover,
+                              placeholder: (c, _) => Container(color: Colors.black12.withOpacity(0.06)),
+                              errorWidget: (c, _, __) => Container(color: Colors.black12.withOpacity(0.06)),
+                            )
+                          : Container(color: Colors.black12.withOpacity(0.06)),
+                    ),
                   ),
-                  const SizedBox(height: 4),
-                  Text('Capacity - 0', style: TextStyle(color: Colors.grey[600], fontSize: 12)),
-                  const SizedBox(height: 6),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Text('₹ ${service.price.toStringAsFixed(0)}/-', style: const TextStyle(fontWeight: FontWeight.w800)),
-                      Row(children: const [Icon(Icons.star, size: 14, color: Color(0xFFFFC107)), SizedBox(width: 4), Text('4.5k')]),
-                    ],
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          service.name,
+                          style: const TextStyle(fontWeight: FontWeight.w700),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        const SizedBox(height: 4),
+                        Text('Capacity - 0', style: TextStyle(color: Colors.grey[600], fontSize: 12)),
+                        const SizedBox(height: 6),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Text('₹ ${service.price.toStringAsFixed(0)}/-', style: const TextStyle(fontWeight: FontWeight.w800)),
+                            Row(children: const [Icon(Icons.star, size: 14, color: Color(0xFFFFC107)), SizedBox(width: 4), Text('4.5k')]),
+                          ],
+                        ),
+                      ],
+                    ),
                   ),
                 ],
               ),
             ),
-          ],
+          ),
         ),
-      ),
+        Positioned(
+          top: 10,
+          right: 10,
+          child: WishlistButton(serviceId: service.id, size: 38),
+        ),
+      ],
     );
   }
 }

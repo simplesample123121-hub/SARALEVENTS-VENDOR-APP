@@ -14,11 +14,11 @@ class ProfileService {
       const Duration(minutes: 5),
       () async {
         final res = await _supabase
-            .from('user_profiles')
+            .from('profiles')
             .select('*')
-            .eq('user_id', userId)
+            .eq('id', userId)
             .maybeSingle();
-        return res as Map<String, dynamic>?;
+        return res;
       },
     );
   }
@@ -32,7 +32,7 @@ class ProfileService {
     String? imageUrl,
   }) async {
     final data = {
-      'user_id': userId,
+      'id': userId,
       'email': email,
       'first_name': firstName,
       'last_name': lastName,
@@ -41,8 +41,8 @@ class ProfileService {
       'updated_at': DateTime.now().toIso8601String(),
     };
     await _supabase
-        .from('user_profiles')
-        .upsert(data, onConflict: 'user_id');
+        .from('profiles')
+        .upsert(data, onConflict: 'id');
     CacheManager.instance.invalidate('profile:$userId');
     return true;
   }
@@ -57,5 +57,43 @@ class ProfileService {
     await storage.upload(path, file, fileOptions: const FileOptions(upsert: true));
     final publicUrl = storage.getPublicUrl(path);
     return publicUrl;
+  }
+
+  // Wishlist APIs
+  Future<List<String>> getWishlistServiceIds(String userId) async {
+    final res = await _supabase
+        .from('profiles')
+        .select('wishlist')
+        .eq('id', userId)
+        .maybeSingle();
+    final wish = (res != null && res['wishlist'] is List)
+        ? List<String>.from(res['wishlist'].map((e) => e.toString()))
+        : <String>[];
+    return wish;
+  }
+
+  Future<List<String>> toggleWishlist({
+    required String userId,
+    required String serviceId,
+  }) async {
+    // Fetch current wishlist
+    final current = await getWishlistServiceIds(userId);
+    final exists = current.contains(serviceId);
+    final updated = List<String>.from(current);
+    if (exists) {
+      updated.remove(serviceId);
+    } else {
+      updated.add(serviceId);
+    }
+
+    // Update in DB
+    await _supabase
+        .from('profiles')
+        .update({'wishlist': updated})
+        .eq('id', userId);
+
+    // Invalidate cached profile
+    CacheManager.instance.invalidate('profile:$userId');
+    return updated;
   }
 }

@@ -44,9 +44,11 @@ class AppRouter {
           redirect: (ctx, state) {
             final s = Provider.of<UserSession>(ctx, listen: false);
             if (s.isPasswordRecovery) return '/auth/reset';
+            // If authenticated, always go to the app home
+            if (s.isAuthenticated) return '/app';
+            // Only show onboarding for unauthenticated users who haven't completed it
             if (!s.isOnboardingComplete) return '/onboarding';
-            if (!s.isAuthenticated) return '/auth/pre';
-            return '/app';
+            return '/auth/pre';
           },
           builder: (ctx, st) => const SizedBox.shrink(),
         ),
@@ -55,6 +57,8 @@ class AppRouter {
           redirect: (ctx, state) {
             final s = Provider.of<UserSession>(ctx, listen: false);
             if (s.isPasswordRecovery) return '/auth/reset';
+            // Authenticated users should not see onboarding
+            if (s.isAuthenticated) return '/app';
             return null;
           },
           builder: (_, __) => const OnboardingScreen(),
