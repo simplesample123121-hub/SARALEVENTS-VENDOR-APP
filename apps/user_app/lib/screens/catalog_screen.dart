@@ -9,8 +9,15 @@ import '../widgets/wishlist_button.dart';
 
 class CatalogScreen extends StatefulWidget {
   final String? selectedCategory;
+  final String? eventType;
+  final String? categoryDisplayName;
   
-  const CatalogScreen({super.key, this.selectedCategory});
+  const CatalogScreen({
+    super.key, 
+    this.selectedCategory, 
+    this.eventType,
+    this.categoryDisplayName,
+  });
 
   @override
   State<CatalogScreen> createState() => _CatalogScreenState();

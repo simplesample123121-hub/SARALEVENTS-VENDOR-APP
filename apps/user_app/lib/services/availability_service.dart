@@ -9,7 +9,10 @@ class AvailabilityService {
   Future<Map<String, dynamic>> getServiceAvailability(String serviceId, DateTime month) async {
     try {
       final startOfMonth = DateTime(month.year, month.month, 1);
-      final endOfMonth = DateTime(month.year, month.month + 1, 0);
+      final startNextMonth = DateTime(month.year, month.month + 1, 1);
+      // Convert LOCAL month boundaries to UTC, so comparisons align with vendor writes
+      final startUtc = startOfMonth.toUtc();
+      final nextUtc = startNextMonth.toUtc();
       final cacheKey = 'availability:$serviceId:${startOfMonth.year}-${startOfMonth.month.toString().padLeft(2, '0')}';
 
       final data = await CacheManager.instance.getOrFetch<List<dynamic>>(
@@ -20,8 +23,8 @@ class AvailabilityService {
               .from('service_availability')
               .select('*')
               .eq('service_id', serviceId)
-              .gte('date', startOfMonth.toIso8601String())
-              .lte('date', endOfMonth.toIso8601String());
+              .gte('date', startUtc.toIso8601String())
+              .lt('date', nextUtc.toIso8601String());
           return response;
         },
       );
@@ -41,7 +44,10 @@ class AvailabilityService {
 
   Future<List<Map<String, dynamic>>> getAvailableTimeSlots(String serviceId, DateTime date) async {
     try {
-      final key = 'timeslots:$serviceId:${date.toIso8601String().split('T')[0]}';
+      // Use LOCAL midnight converted to UTC for the window [dayStart, nextDayStart)
+      final localStart = DateTime(date.year, date.month, date.day);
+      final dateUtc = localStart.toUtc();
+      final key = 'timeslots:$serviceId:${_dateOnly(date)}';
       final response = await CacheManager.instance.getOrFetch<List<dynamic>>(
         key,
         const Duration(minutes: 1),
@@ -50,7 +56,8 @@ class AvailabilityService {
               .from('service_availability')
               .select('*')
               .eq('service_id', serviceId)
-              .eq('date', date.toIso8601String().split('T')[0]);
+              .gte('date', dateUtc.toIso8601String())
+              .lt('date', dateUtc.add(const Duration(days: 1)).toIso8601String());
           return res;
         },
       );
@@ -118,5 +125,12 @@ class AvailabilityService {
       print('Error fetching time slots: $e');
       return [];
     }
+  }
+
+  String _dateOnly(DateTime d) {
+    final y = d.year.toString().padLeft(4, '0');
+    final m = d.month.toString().padLeft(2, '0');
+    final day = d.day.toString().padLeft(2, '0');
+    return '$y-$m-$day';
   }
 }

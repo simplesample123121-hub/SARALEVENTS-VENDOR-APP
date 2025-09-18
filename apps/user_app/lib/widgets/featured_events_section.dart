@@ -24,7 +24,7 @@ class _FeaturedEventsSectionState extends State<FeaturedEventsSection>
   bool _isLoading = true;
   String? _error;
   StreamSubscription? _servicesSubscription;
-  int _updateCount = 0;
+  // int _updateCount = 0; // COMMENTED OUT
 
   @override
   bool get wantKeepAlive => true;
@@ -50,7 +50,7 @@ class _FeaturedEventsSectionState extends State<FeaturedEventsSection>
             _featuredServices = services.take(6).toList(); // Limit to 6 for UI
             _isLoading = false;
             _error = null;
-            _updateCount++;
+            // _updateCount++; // COMMENTED OUT
           });
         }
       },
@@ -129,15 +129,16 @@ class _FeaturedEventsSectionState extends State<FeaturedEventsSection>
                       letterSpacing: -0.5,
                     ),
                   ),
-                  if (_updateCount > 0)
-                    Text(
-                      'Updated $_updateCount time${_updateCount > 1 ? 's' : ''}',
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: Colors.green.shade600,
-                        fontWeight: FontWeight.w500,
-                      ),
-                    ),
+                  // Update counter - COMMENTED OUT
+                  // if (_updateCount > 0)
+                  //   Text(
+                  //     'Updated $_updateCount time${_updateCount > 1 ? 's' : ''}',
+                  //     style: TextStyle(
+                  //       fontSize: 12,
+                  //       color: Colors.green.shade600,
+                  //       fontWeight: FontWeight.w500,
+                  //     ),
+                  //   ),
                 ],
               ),
               GestureDetector(

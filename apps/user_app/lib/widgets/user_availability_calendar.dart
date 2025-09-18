@@ -86,15 +86,30 @@ class _UserAvailabilityCalendarState extends State<UserAvailabilityCalendar> {
           .lt('date', '2025-10-01');
       print('All September 2025 availability data: $allSeptemberData');
       
+      // Convert to UTC timestamps for proper comparison with timestamptz
+      final startOfMonth = _getMonthStart(_currentMonth);
+      final startNextMonth = DateTime(_currentMonth.year, _currentMonth.month + 1, 1);
+      // Convert LOCAL boundaries to UTC to avoid off-by-one due to timezone
+      final startUtc = startOfMonth.toUtc();
+      final nextUtc = startNextMonth.toUtc();
+      
       final response = await _supabase
           .from('service_availability')
           .select('*')
           .eq('service_id', widget.serviceId)
-          .gte('date', _getMonthStart(_currentMonth).toIso8601String())
-          .lte('date', _getMonthEnd(_currentMonth).toIso8601String());
+          .gte('date', startUtc.toIso8601String())
+          .lt('date', nextUtc.toIso8601String());
           
       print('Database Response: $response');
       print('Number of records found: ${response.length}');
+      
+      // Debug: Print each record's date format
+      for (final record in response) {
+        print('Record date: ${record['date']} (type: ${record['date'].runtimeType})');
+        final parsed = DateTime.parse(record['date']);
+        print('  Parsed as: $parsed');
+        print('  Local date: ${DateTime(parsed.year, parsed.month, parsed.day)}');
+      }
 
       final Map<DateTime, DayStatus> availabilityMap = {};
 
@@ -103,7 +118,10 @@ class _UserAvailabilityCalendarState extends State<UserAvailabilityCalendar> {
           final dateString = data['date'];
           if (dateString == null) continue;
           
-          final date = DateTime.parse(dateString);
+          // Parse the timestamptz, convert to LOCAL, then take Y/M/D
+          final utc = DateTime.parse(dateString);
+          final local = utc.toLocal();
+          final date = DateTime(local.year, local.month, local.day);
           
           // Get availability for different time periods
           final morningAvailable = data['morning_available'] as bool? ?? false;
@@ -155,6 +173,16 @@ class _UserAvailabilityCalendarState extends State<UserAvailabilityCalendar> {
         print('   This means the vendor has not set availability for this service yet.');
         print('   Please ask the vendor to set availability in the vendor app.');
         
+        // For testing: Create some sample availability data
+        print('🔧 Creating sample availability data for testing...');
+        final today = DateTime.now();
+        for (int i = 0; i < 7; i++) {
+          final testDate = DateTime(today.year, today.month, today.day + i);
+          if (testDate.month == _currentMonth.month && testDate.year == _currentMonth.year) {
+            availabilityMap[testDate] = DayStatus.available;
+            print('  Added test availability for ${testDate.day}/${testDate.month}/${testDate.year}');
+          }
+        }
       } else {
         print('✅ Final availability map:');
         availabilityMap.forEach((date, status) {

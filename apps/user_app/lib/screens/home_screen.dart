@@ -1,4 +1,3 @@
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:go_router/go_router.dart';
@@ -12,8 +11,10 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../services/profile_service.dart';
 import '../widgets/wishlist_button.dart';
 import '../widgets/banner_widget.dart';
-import '../widgets/banner_debug_widget.dart';
+// import '../widgets/banner_debug_widget.dart'; // COMMENTED OUT
 import '../widgets/featured_events_section.dart';
+import '../widgets/events_section.dart';
+import '../widgets/location_permission_banner.dart';
 import '../services/banner_service.dart';
 import '../services/featured_services_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -215,6 +216,11 @@ class _HomeScreenState extends State<HomeScreen> with RouteAware {
               _buildHeader(),
               const SizedBox(height: 20),
               
+              // Location permission banner
+              const LocationPermissionBanner(
+                margin: EdgeInsets.symmetric(horizontal: 20),
+              ),
+              
               // Search bar
               _buildSearchBar(),
               const SizedBox(height: 20),
@@ -225,6 +231,10 @@ class _HomeScreenState extends State<HomeScreen> with RouteAware {
               
               // Categories section
               _buildCategoriesSection(),
+              const SizedBox(height: 24),
+              
+              // Events section
+              const EventsSection(),
               const SizedBox(height: 24),
 
               // Quick create invitation CTA
@@ -368,32 +378,32 @@ class _HomeScreenState extends State<HomeScreen> with RouteAware {
                 ),
               ),
               
-              // Debug button (only in debug mode)
-              if (kDebugMode)
-                GestureDetector(
-                  onTap: () {
-                    Navigator.of(context).push(
-                      MaterialPageRoute(
-                        builder: (context) => const BannerDebugWidget(),
-                      ),
-                    );
-                  },
-                  child: Container(
-                    width: 40,
-                    height: 40,
-                    decoration: BoxDecoration(
-                      color: Colors.blue[100],
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: Icon(
-                      Icons.bug_report,
-                      color: Colors.blue[700],
-                      size: 20,
-                    ),
-                  ),
-                ),
-              
-              const SizedBox(width: 8),
+              // Debug button (only in debug mode) - COMMENTED OUT
+              // if (kDebugMode)
+              //   GestureDetector(
+              //     onTap: () {
+              //       Navigator.of(context).push(
+              //         MaterialPageRoute(
+              //           builder: (context) => const BannerDebugWidget(),
+              //         ),
+              //       );
+              //     },
+              //     child: Container(
+              //       width: 40,
+              //       height: 40,
+              //       decoration: BoxDecoration(
+              //         color: Colors.blue[100],
+              //         borderRadius: BorderRadius.circular(12),
+              //       ),
+              //       child: Icon(
+              //         Icons.bug_report,
+              //         color: Colors.blue[700],
+              //         size: 20,
+              //       ),
+              //     ),
+              //   ),
+              // 
+              // const SizedBox(width: 8),
               
               // Notification bell
               Container(

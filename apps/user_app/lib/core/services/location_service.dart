@@ -1,24 +1,28 @@
 import 'package:geolocator/geolocator.dart';
 import 'dart:async';
 import 'package:geocoding/geocoding.dart' as geo;
+import 'package:flutter/material.dart';
+import 'permission_service.dart';
 
 class LocationService {
-  static Future<bool> ensurePermission() async {
-    bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
-    if (!serviceEnabled) {
-      return false;
+  /// Ensure location permission is granted
+  static Future<bool> ensurePermission({BuildContext? context}) async {
+    final result = await PermissionService.requestLocationPermission(
+      context: context,
+      showRationale: context != null,
+    );
+    
+    if (!result.isGranted && context != null) {
+      await PermissionService.showPermissionDeniedDialog(context, result.status);
     }
-    LocationPermission permission = await Geolocator.checkPermission();
-    if (permission == LocationPermission.denied) {
-      permission = await Geolocator.requestPermission();
-      if (permission == LocationPermission.denied) {
-        return false;
-      }
-    }
-    if (permission == LocationPermission.deniedForever) {
-      return false;
-    }
-    return true;
+    
+    return result.isGranted;
+  }
+
+  /// Check if location permission is granted without requesting
+  static Future<bool> hasPermission() async {
+    final status = await PermissionService.getLocationPermissionStatus();
+    return status == LocationPermissionStatus.granted;
   }
 
   static Future<Position> getCurrentPosition() async {

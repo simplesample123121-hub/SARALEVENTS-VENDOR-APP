@@ -5,6 +5,8 @@ import '../services/booking_service.dart';
 import '../widgets/user_availability_calendar.dart';
 import '../widgets/time_slot_picker.dart';
 import '../services/availability_service.dart';
+import '../checkout/checkout_state.dart';
+import '../checkout/flow.dart';
 
 class BookingScreen extends StatefulWidget {
   final ServiceItem service;
@@ -670,7 +672,21 @@ class _BookingScreenState extends State<BookingScreen> {
         ],
       ),
       child: ElevatedButton(
-        onPressed: _isLoading ? null : _createBooking,
+        onPressed: _isLoading
+            ? null
+            : () async {
+                await _createBooking();
+                if (!mounted) return;
+                // Launch checkout flow with selected service as initial cart item
+                final item = CartItem(
+                  id: widget.service.id,
+                  title: widget.service.name,
+                  category: 'Service',
+                  price: widget.service.price,
+                  subtitle: widget.service.vendorName,
+                );
+                Navigator.of(context).push(CheckoutFlow.routeWithItem(item));
+              },
         style: ElevatedButton.styleFrom(
           backgroundColor: const Color(0xFFFDBB42),
           foregroundColor: Colors.white,

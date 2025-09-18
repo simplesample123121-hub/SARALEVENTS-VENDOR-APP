@@ -17,12 +17,22 @@ class _DebugScreenState extends State<DebugScreen> {
 
     try {
       // Check if user_roles table exists
-      final rolesResult = await supabase.from('user_roles').select('count').limit(1);
+      await supabase.from('user_roles').select('count').limit(1);
       info += '✅ user_roles table exists\n';
       
-      // Check if user_profiles table exists
-      final profilesResult = await supabase.from('user_profiles').select('count').limit(1);
-      info += '✅ user_profiles table exists\n';
+      // Check which profile table exists
+      try {
+        await supabase.from('profiles').select('count').limit(1);
+        info += '✅ profiles table exists\n';
+      } catch (_) {
+        info += '❌ profiles table missing\n';
+      }
+      try {
+        await supabase.from('user_profiles').select('count').limit(1);
+        info += '✅ user_profiles table exists\n';
+      } catch (_) {
+        info += '❌ user_profiles table missing\n';
+      }
       
       // Check current user
       final user = supabase.auth.currentUser;
@@ -34,9 +44,15 @@ class _DebugScreenState extends State<DebugScreen> {
         final userRoles = await supabase.from('user_roles').select('*').eq('user_id', user.id);
         info += 'User roles: $userRoles\n';
         
-        // Check user profile
-        final userProfile = await supabase.from('user_profiles').select('*').eq('user_id', user.id);
-        info += 'User profile: $userProfile\n';
+        // Check user profile in whichever table exists
+        try {
+          final p1 = await supabase.from('profiles').select('*').eq('user_id', user.id);
+          info += 'profiles row: $p1\n';
+        } catch (_) {}
+        try {
+          final p2 = await supabase.from('user_profiles').select('*').eq('user_id', user.id);
+          info += 'user_profiles row: $p2\n';
+        } catch (_) {}
       }
       
     } catch (e) {

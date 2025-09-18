@@ -45,8 +45,17 @@
 	<true/>
 	<key>UIApplicationSupportsIndirectInputEvents</key>
 	<true/>
+	<!-- Location permissions -->
 	<key>NSLocationWhenInUseUsageDescription</key>
-	<string>Your location helps us show nearby services and addresses.</string>
+	<string>Saral Events uses your location to find nearby events, services, and venues. This helps us provide personalized recommendations and accurate directions.</string>
+	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
+	<string>Saral Events uses your location to find nearby events, services, and venues. This helps us provide personalized recommendations and accurate directions.</string>
+	
+	<!-- Camera and photo permissions -->
+	<key>NSCameraUsageDescription</key>
+	<string>Saral Events needs camera access to take photos for your profile and event invitations.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>Saral Events needs photo library access to select images for your profile and event invitations.</string>
 	<key>CFBundleURLTypes</key>
 	<array>
 		<dict>

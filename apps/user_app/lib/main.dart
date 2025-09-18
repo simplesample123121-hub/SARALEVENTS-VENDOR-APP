@@ -5,6 +5,7 @@ import 'core/supabase/supabase_config.dart';
 import 'core/session.dart';
 import 'core/router.dart';
 import 'core/theme/app_theme.dart';
+import 'core/widgets/permission_manager.dart';
 import 'screens/app_link_handler.dart';
 
 Future<void> main() async {
@@ -32,7 +33,9 @@ class UserApp extends StatelessWidget {
             debugShowCheckedModeBanner: false,
             theme: AppTheme.lightTheme,
             routerConfig: AppRouter.create(session),
-            builder: (context, child) => AppLinkHandler(child: child ?? const SizedBox.shrink()),
+            builder: (context, child) => PermissionManager(
+              child: AppLinkHandler(child: child ?? const SizedBox.shrink()),
+            ),
           );
         },
       ),

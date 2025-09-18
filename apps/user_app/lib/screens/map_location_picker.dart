@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart' as maps;
 import '../core/services/location_service.dart';
 import '../core/services/address_storage.dart';
+import '../core/widgets/permission_manager.dart';
 import 'package:go_router/go_router.dart';
 import 'package:flutter_google_places_sdk/flutter_google_places_sdk.dart';
 
@@ -15,7 +16,8 @@ class MapLocationPicker extends StatefulWidget {
   State<MapLocationPicker> createState() => _MapLocationPickerState();
 }
 
-class _MapLocationPickerState extends State<MapLocationPicker> {
+class _MapLocationPickerState extends State<MapLocationPicker> 
+    with LocationPermissionMixin {
   
   maps.GoogleMapController? _mapController;
   maps.LatLng _centerPosition = const maps.LatLng(17.3850, 78.4867); // Hyderabad default
@@ -40,12 +42,18 @@ class _MapLocationPickerState extends State<MapLocationPicker> {
 
   Future<void> _init() async {
     try {
-      final ok = await LocationService.ensurePermission();
-      if (ok) {
+      final hasPermission = await requestLocationWithRationale(
+        title: 'Location Access Required',
+        message: 'We need access to your location to show you on the map and help you select your address.',
+      );
+      
+      if (hasPermission) {
         final pos = await LocationService.getCurrentPosition();
         _centerPosition = maps.LatLng(pos.latitude, pos.longitude);
         await _updateAddressFromCenter();
       }
+    } catch (e) {
+      debugPrint('Error getting location: $e');
     } finally {
       if (mounted) setState(() => _loading = false);
     }

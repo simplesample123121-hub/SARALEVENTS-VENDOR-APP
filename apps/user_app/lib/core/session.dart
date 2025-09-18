@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:google_sign_in/google_sign_in.dart';
+import 'wishlist_notifier.dart';
 
 class UserSession extends ChangeNotifier {
   bool _isOnboardingComplete = false;
@@ -18,6 +19,11 @@ class UserSession extends ChangeNotifier {
       if (_isAuthenticated) {
         await _checkUserRole();
         await checkProfileSetup();
+        // Initialize wishlist when user logs in
+        WishlistNotifier.instance.initialize();
+      } else {
+        // Clear wishlist when user logs out
+        WishlistNotifier.instance.reset();
       }
       notifyListeners();
     });
@@ -239,6 +245,8 @@ class UserSession extends ChangeNotifier {
     _isAuthenticated = false;
     _userRole = null;
     _isProfileSetupComplete = false;
+    // Clear wishlist on sign out
+    WishlistNotifier.instance.reset();
     notifyListeners();
   }
 

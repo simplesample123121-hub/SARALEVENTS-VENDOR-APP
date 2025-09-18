@@ -39,10 +39,21 @@ android {
             // TODO: Add your own signing config for the release build.
             // Signing with the debug keys for now, so `flutter run --release` works.
             signingConfig = signingConfigs.getByName("debug")
+            // Ensure R8 uses our ProGuard rules and has necessary keep configs
+            isMinifyEnabled = true
+            proguardFiles(
+                getDefaultProguardFile("proguard-android-optimize.txt"),
+                "proguard-rules.pro"
+            )
         }
     }
 }
 
 flutter {
     source = "../.."
+}
+
+dependencies {
+    // Provide ProGuard Keep annotations used by some SDKs (e.g., Razorpay) during R8
+    implementation("com.guardsquare:proguard-annotations:7.4.2")
 }
