@@ -46,8 +46,8 @@ class _PlanningScreenState extends State<PlanningScreen>
     });
 
     try {
-      // Initialize sample data if needed
-      await _eventService.initializeSampleData();
+      // Initialize sample data if needed (disabled for production to avoid repopulating)
+      // await _eventService.initializeSampleData();
       
       final events = await _eventService.getEvents();
       final now = DateTime.now();
@@ -117,15 +117,45 @@ class _PlanningScreenState extends State<PlanningScreen>
     );
 
     if (confirmed == true) {
+      // Keep a copy for quick restore
+      final Event deletedEvent = event;
+
+      // Optimistic UI: remove immediately from lists to reflect deletion
+      setState(() {
+        _allEvents.removeWhere((e) => e.id == event.id);
+        _upcomingEvents.removeWhere((e) => e.id == event.id);
+        _previousEvents.removeWhere((e) => e.id == event.id);
+      });
+
+      // Show snackbar with Undo action
+      if (mounted) {
+        ScaffoldMessenger.of(context)
+          ..hideCurrentSnackBar()
+          ..showSnackBar(
+            SnackBar(
+              content: Text('"${event.name}" deleted'),
+              duration: const Duration(seconds: 4),
+              action: SnackBarAction(
+                label: 'UNDO',
+                onPressed: () async {
+                  // Recreate the event quickly
+                  await _eventService.saveEvent(deletedEvent);
+                  if (mounted) {
+                    _loadEvents();
+                  }
+                },
+              ),
+            ),
+          );
+      }
+
       try {
         await _eventService.deleteEvent(event.id);
+        // Final refresh to ensure state matches server/local storage
         _loadEvents();
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('${event.name} deleted successfully')),
-          );
-        }
       } catch (e) {
+        // If something goes wrong, reload data to restore consistency
+        _loadEvents();
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(

@@ -143,17 +143,38 @@ class _ChecklistScreenState extends State<ChecklistScreen> {
     );
 
     if (confirmed == true) {
+      final ChecklistTask deletedTask = task;
+
+      // Optimistic UI: remove immediately
+      setState(() { _tasks.removeWhere((t) => t.id == task.id); });
+
+      // Snackbar with UNDO
+      if (mounted) {
+        ScaffoldMessenger.of(context)
+          ..hideCurrentSnackBar()
+          ..showSnackBar(
+            SnackBar(
+              content: Text('"${task.title}" deleted'),
+              duration: const Duration(seconds: 4),
+              action: SnackBarAction(
+                label: 'UNDO',
+                onPressed: () async {
+                  await _eventService.saveChecklistTask(deletedTask);
+                  if (mounted) {
+                    await _loadTasks();
+                  }
+                },
+              ),
+            ),
+          );
+      }
+
       try {
         await _eventService.deleteChecklistTask(task.id, widget.event.id);
         await _loadTasks();
-        
-        if (mounted) {
-          HapticFeedback.lightImpact();
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Task deleted successfully!')),
-          );
-        }
+        if (mounted) HapticFeedback.lightImpact();
       } catch (e) {
+        await _loadTasks();
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(

@@ -24,6 +24,7 @@ class FeaturedEventCard extends StatelessWidget {
       child: Container(
         width: width,
         height: height,
+        // Outer spacing so cards don't stick to each other or edges
         margin: const EdgeInsets.only(right: 16),
         decoration: BoxDecoration(
           color: Colors.white,
@@ -43,7 +44,9 @@ class FeaturedEventCard extends StatelessWidget {
             ),
           ],
         ),
-        child: Column(
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(16),
+          child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             // Image section with overlay elements
@@ -52,41 +55,31 @@ class FeaturedEventCard extends StatelessWidget {
               child: Stack(
                 children: [
                   // Main image
-                  ClipRRect(
-                    borderRadius: const BorderRadius.only(
-                      topLeft: Radius.circular(16),
-                      topRight: Radius.circular(16),
-                    ),
-                    child: SizedBox(
-                      width: double.infinity,
-                      height: double.infinity,
-                      child: service.media.isNotEmpty
-                          ? CachedNetworkImage(
-                              imageUrl: service.media.first.url,
-                              fit: BoxFit.cover,
-                              placeholder: (context, url) => Container(
-                                color: Colors.grey.shade200,
-                                child: Center(
-                                  child: CircularProgressIndicator(
-                                    strokeWidth: 2,
-                                    color: Theme.of(context).colorScheme.primary,
-                                  ),
+                  SizedBox(
+                    width: double.infinity,
+                    height: double.infinity,
+                    child: service.media.isNotEmpty
+                        ? CachedNetworkImage(
+                            imageUrl: service.media.first.url,
+                            fit: BoxFit.cover,
+                            placeholder: (context, url) => Container(
+                              color: Colors.grey.shade200,
+                              child: Center(
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  color: Theme.of(context).colorScheme.primary,
                                 ),
                               ),
-                              errorWidget: (context, url, error) => _buildFallbackImage(),
-                            )
-                          : _buildFallbackImage(),
-                    ),
+                            ),
+                            errorWidget: (context, url, error) => _buildFallbackImage(),
+                          )
+                        : _buildFallbackImage(),
                   ),
                   
                   // Subtle gradient overlay for better contrast
                   Positioned.fill(
-                    child: Container(
+                    child: DecoratedBox(
                       decoration: BoxDecoration(
-                        borderRadius: const BorderRadius.only(
-                          topLeft: Radius.circular(16),
-                          topRight: Radius.circular(16),
-                        ),
                         gradient: LinearGradient(
                           begin: Alignment.topCenter,
                           end: Alignment.bottomCenter,
@@ -152,11 +145,11 @@ class FeaturedEventCard extends StatelessWidget {
               ),
             ),
             
-            // Content section
+            // Content section with consistent inner padding
             Expanded(
               flex: 2,
               child: Padding(
-                padding: const EdgeInsets.all(10),
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   mainAxisSize: MainAxisSize.min,
@@ -176,7 +169,7 @@ class FeaturedEventCard extends StatelessWidget {
                       ),
                     ),
                     
-                    const SizedBox(height: 4),
+                    const SizedBox(height: 6),
                     
                     // Vendor name
                     Text(
@@ -191,7 +184,7 @@ class FeaturedEventCard extends StatelessWidget {
                       overflow: TextOverflow.ellipsis,
                     ),
                     
-                    const SizedBox(height: 10),
+                    const SizedBox(height: 12),
                     
                     // Price and capacity info
                     Row(
@@ -267,6 +260,7 @@ class FeaturedEventCard extends StatelessWidget {
             ),
           ],
         ),
+      ),
       ),
     );
   }

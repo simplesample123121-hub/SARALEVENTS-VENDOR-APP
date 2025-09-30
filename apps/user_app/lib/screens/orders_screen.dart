@@ -79,7 +79,21 @@ class _OrdersScreenState extends State<OrdersScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return _isLoading
+    return Scaffold(
+      backgroundColor: Colors.grey.shade50,
+      appBar: AppBar(
+        toolbarHeight: 72,
+        title: const Text(
+          'Orders',
+          style: TextStyle(
+            fontWeight: FontWeight.bold,
+            fontSize: 24,
+          ),
+        ),
+        backgroundColor: Colors.white,
+        elevation: 0,
+      ),
+      body: _isLoading
           ? const Center(child: CircularProgressIndicator())
           : _error != null
               ? Center(
@@ -114,8 +128,8 @@ class _OrdersScreenState extends State<OrdersScreen> {
                           Text(
                             'Your booking history will appear here',
                             style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                              color: Colors.grey[600],
-                            ),
+                                  color: Colors.grey[600],
+                                ),
                           ),
                         ],
                       ),
@@ -123,7 +137,7 @@ class _OrdersScreenState extends State<OrdersScreen> {
                   : RefreshIndicator(
                       onRefresh: _loadBookings,
                       child: ListView.separated(
-                        padding: const EdgeInsets.all(16),
+                        padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
                         itemCount: _bookings.length,
                         separatorBuilder: (_, __) => const SizedBox(height: 12),
                         itemBuilder: (context, index) {
@@ -208,8 +222,8 @@ class _OrdersScreenState extends State<OrdersScreen> {
                                       Text(
                                         '₹${amount.toStringAsFixed(2)}',
                                         style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                                          fontWeight: FontWeight.bold,
-                                        ),
+                                              fontWeight: FontWeight.bold,
+                                            ),
                                       ),
                                     ],
                                   ),
@@ -249,6 +263,7 @@ class _OrdersScreenState extends State<OrdersScreen> {
                           );
                         },
                       ),
-                    );
+                    ),
+    );
   }
 }
