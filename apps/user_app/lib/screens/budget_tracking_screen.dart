@@ -134,15 +134,34 @@ class _BudgetTrackingScreenState extends State<BudgetTrackingScreen> {
     );
 
     if (confirmed == true) {
+      final BudgetItem deleted = item;
+      // Optimistic remove
+      setState(() { _budgetItems.removeWhere((b) => b.id == item.id); });
+
+      // Snackbar with UNDO
+      if (mounted) {
+        ScaffoldMessenger.of(context)
+          ..hideCurrentSnackBar()
+          ..showSnackBar(
+            SnackBar(
+              content: Text('"${item.itemName}" deleted'),
+              duration: const Duration(seconds: 4),
+              action: SnackBarAction(
+                label: 'UNDO',
+                onPressed: () async {
+                  await _eventService.saveBudgetItem(deleted);
+                  if (mounted) _loadBudgetItems();
+                },
+              ),
+            ),
+          );
+      }
+
       try {
         await _eventService.deleteBudgetItem(item.id, widget.event.id);
         _loadBudgetItems();
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Budget item deleted successfully')),
-          );
-        }
       } catch (e) {
+        _loadBudgetItems();
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(

@@ -187,10 +187,16 @@ class _FeaturedEventsSectionState extends State<FeaturedEventsSection>
         
         const SizedBox(height: 20),
         
-        // Services list
-        SizedBox(
-          height: 210,
-          child: _buildServicesContent(),
+        // Services list with responsive height matching card size
+        LayoutBuilder(
+          builder: (context, constraints) {
+            final screenWidth = MediaQuery.of(context).size.width;
+            final listHeight = _computeCardHeight(screenWidth);
+            return SizedBox(
+              height: listHeight,
+              child: _buildServicesContent(),
+            );
+          },
         ),
       ],
     );
@@ -378,23 +384,61 @@ class _FeaturedEventsSectionState extends State<FeaturedEventsSection>
   }
 
   Widget _buildServicesList() {
-    return RefreshIndicator(
-      onRefresh: _refreshServices,
-      child: ListView.builder(
-        scrollDirection: Axis.horizontal,
-        padding: const EdgeInsets.symmetric(horizontal: 20),
-        itemCount: _featuredServices.length,
-        itemBuilder: (context, index) {
-          final service = _featuredServices[index];
-          return FeaturedEventCard(
-            service: service,
-            width: 170,
-            height: 210,
-            onTap: () => widget.onServiceTap?.call(service),
-          );
-        },
-      ),
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final screenWidth = MediaQuery.of(context).size.width;
+        // Responsive card sizing (keep consistent with list height above)
+        final double cardWidth = _computeCardWidth(screenWidth);
+        final double cardHeight = _computeCardHeight(screenWidth);
+
+        return RefreshIndicator(
+          onRefresh: _refreshServices,
+          child: ListView.builder(
+            scrollDirection: Axis.horizontal,
+            padding: const EdgeInsets.symmetric(horizontal: 20),
+            itemCount: _featuredServices.length,
+            itemBuilder: (context, index) {
+              final service = _featuredServices[index];
+              return FeaturedEventCard(
+                service: service,
+                width: cardWidth,
+                height: cardHeight,
+                onTap: () => widget.onServiceTap?.call(service),
+              );
+            },
+          ),
+        );
+      },
     );
+  }
+
+  // Helpers to keep dimensions consistent everywhere
+  double _computeCardWidth(double screenWidth) {
+    if (screenWidth < 360) {
+      return 150;
+    } else if (screenWidth < 420) {
+      return 165;
+    } else if (screenWidth < 520) {
+      return 180;
+    } else if (screenWidth < 720) {
+      return 200;
+    } else {
+      return 230;
+    }
+  }
+
+  double _computeCardHeight(double screenWidth) {
+    if (screenWidth < 360) {
+      return 210; // slightly taller for content
+    } else if (screenWidth < 420) {
+      return 220;
+    } else if (screenWidth < 520) {
+      return 230;
+    } else if (screenWidth < 720) {
+      return 250;
+    } else {
+      return 270;
+    }
   }
 
   @override

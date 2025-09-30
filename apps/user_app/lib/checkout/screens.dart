@@ -23,7 +23,6 @@ class CartPage extends StatelessWidget {
     final installments = state.installmentBreakdown;
     return Scaffold(
       appBar: AppBar(title: const Text('Cart')),
-      bottomNavigationBar: _bottomNav(),
       body: Column(
         children: [
           InstallmentCard(installments: installments, total: state.totalPrice),
@@ -93,17 +92,7 @@ class CartPage extends StatelessWidget {
     });
   }
 
-  Widget _bottomNav() {
-    return NavigationBar(
-      destinations: const [
-        NavigationDestination(icon: Icon(Icons.shopping_cart_outlined), label: 'Cart'),
-        NavigationDestination(icon: Icon(Icons.home_outlined), label: 'Home'),
-        NavigationDestination(icon: Icon(Icons.favorite_outline), label: 'Favorites'),
-        NavigationDestination(icon: Icon(Icons.person_outline), label: 'Profile'),
-      ],
-      selectedIndex: 0,
-    );
-  }
+  Widget _bottomNav() { return const SizedBox.shrink(); }
 }
 
 class PaymentDetailsPage extends StatelessWidget {

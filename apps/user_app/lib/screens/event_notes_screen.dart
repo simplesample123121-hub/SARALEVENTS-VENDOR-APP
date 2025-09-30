@@ -76,9 +76,39 @@ class _EventNotesScreenState extends State<EventNotesScreen> {
                           child: ListTile(
                             title: Text(note.title),
                             subtitle: Text(note.content),
-                            trailing: IconButton(
-                              icon: const Icon(Icons.delete),
-                              onPressed: () => _deleteNote(note.id),
+                            trailing: PopupMenuButton<String>(
+                              onSelected: (value) {
+                                switch (value) {
+                                  case 'edit':
+                                    _showEditNoteDialog(note);
+                                    break;
+                                  case 'delete':
+                                    _deleteNote(note.id);
+                                    break;
+                                }
+                              },
+                              itemBuilder: (context) => const [
+                                PopupMenuItem(
+                                  value: 'edit',
+                                  child: Row(
+                                    children: [
+                                      Icon(Icons.edit, size: 18),
+                                      SizedBox(width: 8),
+                                      Text('Edit'),
+                                    ],
+                                  ),
+                                ),
+                                PopupMenuItem(
+                                  value: 'delete',
+                                  child: Row(
+                                    children: [
+                                      Icon(Icons.delete, size: 18, color: Colors.red),
+                                      SizedBox(width: 8),
+                                      Text('Delete', style: TextStyle(color: Colors.red)),
+                                    ],
+                                  ),
+                                ),
+                              ],
                             ),
                           ),
                         );
@@ -158,5 +188,64 @@ class _EventNotesScreenState extends State<EventNotesScreen> {
         SnackBar(content: Text('Error deleting note: $e')),
       );
     }
+  }
+
+  void _showEditNoteDialog(EventNote note) {
+    final titleController = TextEditingController(text: note.title);
+    final contentController = TextEditingController(text: note.content);
+
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Edit Note'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextField(
+              controller: titleController,
+              decoration: const InputDecoration(labelText: 'Title'),
+            ),
+            const SizedBox(height: 16),
+            TextField(
+              controller: contentController,
+              decoration: const InputDecoration(labelText: 'Content'),
+              maxLines: 3,
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () async {
+              final updated = EventNote(
+                id: note.id,
+                eventId: note.eventId,
+                userId: note.userId,
+                title: titleController.text.trim(),
+                content: contentController.text.trim(),
+                category: note.category,
+                isPinned: note.isPinned,
+                attachments: note.attachments,
+                createdAt: note.createdAt,
+                updatedAt: DateTime.now(),
+              );
+              try {
+                await _eventService.saveEventNote(updated);
+                Navigator.pop(context);
+                _loadNotes();
+              } catch (e) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(content: Text('Error updating note: $e')),
+                );
+              }
+            },
+            child: const Text('Save'),
+          ),
+        ],
+      ),
+    );
   }
 }

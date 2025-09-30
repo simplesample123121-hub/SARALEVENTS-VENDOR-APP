@@ -36,11 +36,19 @@ class _EventDetailsScreenState extends State<EventDetailsScreen> {
     _eventService = EventPlanningService(Supabase.instance.client);
     _loadEventData();
     _startCountdownTimer();
+
+    // Subscribe to real-time updates for tasks to refresh stats in place
+    _eventService.subscribeToTaskUpdates(_event.id, (_) {
+      if (mounted) {
+        _loadEventData();
+      }
+    });
   }
 
   @override
   void dispose() {
     _countdownTimer?.cancel();
+    _eventService.unsubscribeFromUpdates();
     super.dispose();
   }
 
@@ -88,6 +96,20 @@ class _EventDetailsScreenState extends State<EventDetailsScreen> {
     }
   }
 
+  double _computeTaskProgressBar() {
+    final int total = _statistics?.totalTasks ?? 0;
+    final double pct = (_statistics?.taskCompletionPercentage ?? 0) / 100.0;
+    if (total <= 0) return 0.0; // 0/0 -> show empty bar
+    return pct.clamp(0.0, 1.0);
+  }
+
+  double? _computeBudgetProgressBar() {
+    final double budget = _event.budget ?? 0;
+    if (budget <= 0) return null; // hide bar if no budget set
+    final double spent = (_event.spentAmount ?? 0).toDouble();
+    return (spent / budget).clamp(0.0, 1.0);
+  }
+
   Future<void> _navigateToEditEvent() async {
     final result = await Navigator.of(context).push(
       MaterialPageRoute(
@@ -101,39 +123,43 @@ class _EventDetailsScreenState extends State<EventDetailsScreen> {
   }
 
   Future<void> _navigateToChecklist() async {
-    final result = await Navigator.of(context).push(
+    await Navigator.of(context).push(
       MaterialPageRoute(
         builder: (context) => ChecklistScreen(event: _event),
       ),
     );
     
-    if (result == true) {
-      _loadEventData();
-    }
+    // Always refresh after returning to reflect any changes
+    _loadEventData();
   }
 
   Future<void> _navigateToGuestList() async {
-    final result = await Navigator.of(context).push(
+    await Navigator.of(context).push(
       MaterialPageRoute(
         builder: (context) => GuestListScreen(event: _event),
       ),
     );
     
-    if (result == true) {
-      _loadEventData();
-    }
+    _loadEventData();
   }
 
   Future<void> _navigateToNotes() async {
-    final result = await Navigator.of(context).push(
+    await Navigator.of(context).push(
       MaterialPageRoute(
         builder: (context) => EventNotesScreen(event: _event),
       ),
     );
     
-    if (result == true) {
-      _loadEventData();
-    }
+    _loadEventData();
+  }
+
+  Future<void> _navigateToBudget() async {
+    await Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (context) => BudgetTrackingScreen(event: _event),
+      ),
+    );
+    _loadEventData();
   }
 
   @override
@@ -578,7 +604,7 @@ class _EventDetailsScreenState extends State<EventDetailsScreen> {
                   color: Colors.green,
                   progress: _isLoading 
                       ? 0.0 
-                      : ((_statistics?.taskCompletionPercentage ?? 0) / 100).clamp(0.0, 1.0),
+                      : _computeTaskProgressBar(),
                   onTap: _navigateToChecklist,
                 ),
               ),
@@ -610,16 +636,8 @@ class _EventDetailsScreenState extends State<EventDetailsScreen> {
                       : 'Not set',
                   icon: Icons.currency_rupee,
                   color: Colors.orange,
-                  progress: _event.budget != null && _event.budget! > 0
-                      ? ((_event.spentAmount ?? 0) / _event.budget!).clamp(0.0, 1.0)
-                      : null,
-                  onTap: () {
-                    Navigator.of(context).push(
-                      MaterialPageRoute(
-                        builder: (context) => BudgetTrackingScreen(event: _event),
-                      ),
-                    );
-                  },
+                  progress: _computeBudgetProgressBar(),
+                  onTap: _navigateToBudget,
                 ),
               ),
               const SizedBox(width: 12),

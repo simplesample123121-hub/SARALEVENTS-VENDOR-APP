@@ -10,6 +10,7 @@ import 'catalog_screen.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../services/profile_service.dart';
 import '../widgets/wishlist_button.dart';
+import 'service_details_screen.dart';
 import '../widgets/banner_widget.dart';
 // import '../widgets/banner_debug_widget.dart'; // COMMENTED OUT
 import '../widgets/featured_events_section.dart';
@@ -278,7 +279,11 @@ class _HomeScreenState extends State<HomeScreen> with RouteAware {
                 onServiceTap: (service) {
                   // Navigate to service details
                   debugPrint('Tapped on service: ${service.name}');
-                  // TODO: Navigate to service details screen
+                  Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (_) => ServiceDetailsScreen(service: service),
+                    ),
+                  );
                 },
               ),
               const SizedBox(height: 20),
