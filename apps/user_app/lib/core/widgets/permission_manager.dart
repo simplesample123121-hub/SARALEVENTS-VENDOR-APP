@@ -20,6 +20,7 @@ class PermissionManager extends StatefulWidget {
 class _PermissionManagerState extends State<PermissionManager> 
     with WidgetsBindingObserver {
   bool _permissionsInitialized = false;
+  bool _serviceBannerShown = false;
 
   @override
   void initState() {
@@ -55,6 +56,7 @@ class _PermissionManagerState extends State<PermissionManager>
     try {
       await PermissionService.initializePermissions(context);
       _permissionsInitialized = true;
+      await _maybeShowServiceDisabledBanner();
     } catch (e) {
       debugPrint('Error initializing permissions: $e');
     }
@@ -70,8 +72,54 @@ class _PermissionManagerState extends State<PermissionManager>
       if (status == LocationPermissionStatus.granted) {
         await PermissionService.clearLocationPermissionDenied();
       }
+      await _maybeShowServiceDisabledBanner();
     } catch (e) {
       debugPrint('Error checking permission changes: $e');
+    }
+  }
+
+  Future<void> _maybeShowServiceDisabledBanner() async {
+    if (!mounted) return;
+    try {
+      final status = await PermissionService.getLocationPermissionStatus();
+      if (status == LocationPermissionStatus.serviceDisabled && !_serviceBannerShown) {
+        _serviceBannerShown = true;
+        final messenger = ScaffoldMessenger.maybeOf(context);
+        if (messenger != null) {
+          messenger.clearMaterialBanners();
+          messenger.showMaterialBanner(
+            MaterialBanner(
+              backgroundColor: Colors.orange.shade50,
+              elevation: 1,
+              content: Row(
+                children: [
+                  Icon(Icons.location_disabled, color: Colors.orange.shade700),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Text(
+                      'Location services are turned off. Enable for better recommendations.',
+                      style: TextStyle(color: Colors.orange.shade900, fontWeight: FontWeight.w500),
+                    ),
+                  ),
+                ],
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () {
+                    messenger.hideCurrentMaterialBanner();
+                  },
+                  child: const Text('Dismiss'),
+                ),
+              ],
+            ),
+          );
+          Future.delayed(const Duration(seconds: 4), () {
+            if (mounted) messenger.hideCurrentMaterialBanner();
+          });
+        }
+      }
+    } catch (_) {
+      // ignore
     }
   }
 

@@ -1,9 +1,9 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'checkout_state.dart';
 import 'widgets.dart';
-import '../services/razorpay_service.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
+import '../services/payment_service.dart';
 
 // Shared button style
 ButtonStyle _primaryBtn(BuildContext context) => ElevatedButton.styleFrom(
@@ -211,11 +211,12 @@ class PaymentMethodPage extends StatefulWidget {
 
 class _PaymentMethodPageState extends State<PaymentMethodPage> {
   SelectedPaymentMethod? _method;
-  final RazorpayService _razorpay = RazorpayService();
+  final PaymentService _paymentService = PaymentService();
+  bool _isProcessing = false;
 
   @override
   void dispose() {
-    _razorpay.dispose();
+    _paymentService.dispose();
     super.dispose();
   }
 
@@ -236,7 +237,7 @@ class _PaymentMethodPageState extends State<PaymentMethodPage> {
           Row(children: [
             Expanded(
               child: ElevatedButton(
-                onPressed: () async {
+                onPressed: _isProcessing ? null : () async {
                   final state = context.read<CheckoutState>();
                   final m = _method ?? SelectedPaymentMethod(type: PaymentMethodType.cash);
                   state.savePaymentMethod(m);
@@ -246,61 +247,54 @@ class _PaymentMethodPageState extends State<PaymentMethodPage> {
                     return;
                   }
 
-                  // Prepare user details
-                  final user = Supabase.instance.client.auth.currentUser;
-                  final name = state.billingDetails?.name ?? user?.userMetadata?['name'] ?? 'Customer';
-                  final email = state.billingDetails?.email ?? user?.email ?? '';
-                  final phone = state.billingDetails?.phone ?? '';
-
-                  // Create order via Edge Function
+                  // Process payment using the comprehensive payment service
+                  setState(() => _isProcessing = true);
+                  
                   try {
-                    final amountPaise = (state.totalPrice * 100).round();
-                    final order = await _razorpay.createOrderOnServer(
-                      amountInPaise: amountPaise,
-                      currency: 'INR',
-                      receipt: 'ord_${DateTime.now().millisecondsSinceEpoch}',
-                      notes: {
-                        'app': 'saral_user',
-                      },
-                    );
-
-                    // Get RZP key id from env (via Supabase functions config or remote config)
-                    final keyId = Supabase.instance.client.functions.invoke('config_get', body: {'key': 'RAZORPAY_KEY_ID'});
-                    final res = await keyId;
-                    final key = (res.status == 200 && res.data is Map && res.data['value'] is String)
-                        ? res.data['value'] as String
-                        : '';
-                    if (key.isEmpty) {
-                      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Razorpay Key ID missing')));
-                      return;
-                    }
-
-                    _razorpay.init(
-                      onSuccess: (paymentId) {
+                    await _paymentService.processPayment(
+                      context: context,
+                      checkoutState: state,
+                      onSuccess: () {
+                        setState(() => _isProcessing = false);
                         widget.onNext();
                       },
-                      onError: (code, message) {
-                        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Payment failed: $message')));
+                      onFailure: () {
+                        setState(() => _isProcessing = false);
+                        // Stay on current screen for retry
                       },
                     );
-
-                    _razorpay.openCheckout(
-                      keyId: key,
-                      amountInPaise: amountPaise,
-                      name: 'Saral Events',
-                      description: 'Service payment',
-                      orderId: order['id'] as String,
-                      currency: 'INR',
-                      prefillName: name,
-                      prefillEmail: email,
-                      prefillContact: phone,
-                    );
                   } catch (e) {
-                    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e')));
+                    setState(() => _isProcessing = false);
+                    if (kDebugMode) {
+                      debugPrint('Payment processing error: $e');
+                    }
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text('Payment failed: $e'),
+                        backgroundColor: Colors.red,
+                        duration: const Duration(seconds: 5),
+                      ),
+                    );
                   }
                 },
                 style: _primaryBtn(context),
-                child: const Text('Next'),
+                child: _isProcessing
+                    ? const Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          SizedBox(
+                            width: 20,
+                            height: 20,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              valueColor: AlwaysStoppedAnimation<Color>(Colors.black87),
+                            ),
+                          ),
+                          SizedBox(width: 12),
+                          Text('Processing...'),
+                        ],
+                      )
+                    : const Text('Pay Now'),
               ),
             ),
           ]),

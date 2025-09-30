@@ -14,7 +14,7 @@ import '../widgets/banner_widget.dart';
 // import '../widgets/banner_debug_widget.dart'; // COMMENTED OUT
 import '../widgets/featured_events_section.dart';
 import '../widgets/events_section.dart';
-import '../widgets/location_permission_banner.dart';
+// LocationPermissionBanner removed in favor of global transient banner
 import '../services/banner_service.dart';
 import '../services/featured_services_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -216,10 +216,7 @@ class _HomeScreenState extends State<HomeScreen> with RouteAware {
               _buildHeader(),
               const SizedBox(height: 20),
               
-              // Location permission banner
-              const LocationPermissionBanner(
-                margin: EdgeInsets.symmetric(horizontal: 20),
-              ),
+              // Location permission banner removed; global banner is shown by PermissionManager
               
               // Search bar
               _buildSearchBar(),

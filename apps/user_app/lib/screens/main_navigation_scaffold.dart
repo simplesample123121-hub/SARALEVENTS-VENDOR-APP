@@ -34,8 +34,6 @@ class _MainNavigationScaffoldState extends State<MainNavigationScaffold> {
         bottomNavigationBar: ListenableBuilder(
           listenable: WishlistNotifier.instance,
           builder: (context, _) {
-            final wishlistCount = WishlistNotifier.instance.count;
-            
             return BottomNavigationBar(
               type: BottomNavigationBarType.fixed,
               currentIndex: _currentIndex,
@@ -60,67 +58,9 @@ class _MainNavigationScaffoldState extends State<MainNavigationScaffold> {
                   activeIcon: Icon(Icons.event_note, color: Color(0xFFFDBB42)),
                   label: 'Planning',
                 ),
-                BottomNavigationBarItem(
-                  icon: Stack(
-                    children: [
-                      const Icon(Icons.favorite_border),
-                      if (wishlistCount > 0)
-                        Positioned(
-                          right: 0,
-                          top: 0,
-                          child: Container(
-                            padding: const EdgeInsets.all(2),
-                            decoration: BoxDecoration(
-                              color: Colors.red,
-                              borderRadius: BorderRadius.circular(8),
-                            ),
-                            constraints: const BoxConstraints(
-                              minWidth: 16,
-                              minHeight: 16,
-                            ),
-                            child: Text(
-                              wishlistCount > 99 ? '99+' : wishlistCount.toString(),
-                              style: const TextStyle(
-                                color: Colors.white,
-                                fontSize: 10,
-                                fontWeight: FontWeight.bold,
-                              ),
-                              textAlign: TextAlign.center,
-                            ),
-                          ),
-                        ),
-                    ],
-                  ),
-                  activeIcon: Stack(
-                    children: [
-                      const Icon(Icons.favorite, color: Color(0xFFFDBB42)),
-                      if (wishlistCount > 0)
-                        Positioned(
-                          right: 0,
-                          top: 0,
-                          child: Container(
-                            padding: const EdgeInsets.all(2),
-                            decoration: BoxDecoration(
-                              color: Colors.red,
-                              borderRadius: BorderRadius.circular(8),
-                            ),
-                            constraints: const BoxConstraints(
-                              minWidth: 16,
-                              minHeight: 16,
-                            ),
-                            child: Text(
-                              wishlistCount > 99 ? '99+' : wishlistCount.toString(),
-                              style: const TextStyle(
-                                color: Colors.white,
-                                fontSize: 10,
-                                fontWeight: FontWeight.bold,
-                              ),
-                              textAlign: TextAlign.center,
-                            ),
-                          ),
-                        ),
-                    ],
-                  ),
+                const BottomNavigationBarItem(
+                  icon: Icon(Icons.favorite_border),
+                  activeIcon: Icon(Icons.favorite, color: Color(0xFFFDBB42)),
                   label: 'Wishlist',
                 ),
                 const BottomNavigationBarItem(
