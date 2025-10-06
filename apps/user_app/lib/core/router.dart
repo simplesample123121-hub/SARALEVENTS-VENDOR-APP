@@ -52,8 +52,16 @@ class AppRouter {
         GoRoute(
           path: '/',
           redirect: (ctx, state) {
-            // Always go to homepage when the app is opened
-            return '/app';
+            final s = Provider.of<UserSession>(ctx, listen: false);
+            if (s.isPasswordRecovery) return '/auth/reset';
+            // If authenticated, check setup then location
+            if (s.isAuthenticated) {
+              if (!s.isProfileSetupComplete) return '/auth/setup';
+              return '/location/check';
+            }
+            // Only show onboarding for unauthenticated users who haven't completed it
+            if (!s.isOnboardingComplete) return '/onboarding';
+            return '/auth/pre';
           },
           builder: (ctx, st) => const SizedBox.shrink(),
         ),

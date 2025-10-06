@@ -9,17 +9,16 @@
     <!-- Background location (optional, for future features) -->
     <!-- <uses-permission android:name="android.permission.ACCESS_BACKGROUND_LOCATION" /> -->
     
-    <!-- Other permissions -->
-    <uses-permission android:name="android.permission.QUERY_ALL_PACKAGES" />
+    <!-- Avoid QUERY_ALL_PACKAGES to pass Play review unless justified -->
     
     <!-- Camera and storage permissions for profile pictures -->
     <uses-permission android:name="android.permission.CAMERA" />
-    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" />
-    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" android:maxSdkVersion="28" />
+    <!-- Use scoped storage; avoid legacy external storage permissions for Play policy -->
     <application
         android:label="Saral Events"
         android:name="${applicationName}"
-        android:icon="@mipmap/ic_launcher">
+        android:icon="@mipmap/ic_launcher"
+        android:extractNativeLibs="true">
         <activity
             android:name=".MainActivity"
             android:exported="true"
@@ -73,9 +72,7 @@
                 <data android:scheme="saralevents" android:host="auth" android:pathPrefix="/confirm" />
             </intent-filter>
         </activity>
-        <meta-data
-            android:name="com.google.android.geo.API_KEY"
-            android:value="AIzaSyBdMMV-ceWqcoVKE_8bzMS50VARGEqT5zI" />
+        <!-- If you use Google Maps SDK, re-add the API key via manifestPlaceholders or meta-data. -->
         <!-- Don't delete the meta-data below.
              This is used by the Flutter tool to generate GeneratedPluginRegistrant.java -->
         <meta-data

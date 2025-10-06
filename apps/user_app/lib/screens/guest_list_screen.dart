@@ -17,6 +17,7 @@ class _GuestListScreenState extends State<GuestListScreen> {
   late final EventPlanningService _eventService;
   
   List<GuestCategory> _categories = [];
+  List<Event> _allEvents = [];
   bool _isLoading = true;
   int _totalGuests = 0;
 
@@ -25,6 +26,14 @@ class _GuestListScreenState extends State<GuestListScreen> {
     super.initState();
     _eventService = EventPlanningService(Supabase.instance.client);
     _loadGuestCategories();
+    _loadEventsForSwitcher();
+  }
+
+  Future<void> _loadEventsForSwitcher() async {
+    try {
+      final events = await _eventService.getEvents();
+      if (mounted) setState(() { _allEvents = events; });
+    } catch (_) {}
   }
 
   Future<void> _loadGuestCategories() async {
@@ -203,6 +212,52 @@ class _GuestListScreenState extends State<GuestListScreen> {
         ),
         backgroundColor: Colors.white,
         elevation: 0,
+        actions: [
+          PopupMenuButton<Event>(
+            tooltip: 'Switch Event',
+            child: Row(
+              children: [
+                ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 160),
+                  child: Text(
+                    widget.event.name,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(fontWeight: FontWeight.w600),
+                  ),
+                ),
+                const SizedBox(width: 4),
+                const Icon(Icons.arrow_drop_down),
+                const SizedBox(width: 8),
+              ],
+            ),
+            onSelected: (ev) {
+              if (ev.id == widget.event.id) return;
+              Navigator.of(context).pushReplacement(
+                MaterialPageRoute(builder: (_) => GuestListScreen(event: ev)),
+              );
+            },
+            itemBuilder: (context) {
+              if (_allEvents.isEmpty) {
+                return [
+                  const PopupMenuItem<Event>(
+                    enabled: false,
+                    child: Text('No events found'),
+                  ),
+                ];
+              }
+              return _allEvents.map((e) => PopupMenuItem<Event>(
+                value: e,
+                child: Row(
+                  children: [
+                    Icon(e.type.icon, color: e.type.color, size: 18),
+                    const SizedBox(width: 8),
+                    Expanded(child: Text(e.name, overflow: TextOverflow.ellipsis)),
+                  ],
+                ),
+              )).toList();
+            },
+          ),
+        ],
       ),
       body: Column(
         children: [

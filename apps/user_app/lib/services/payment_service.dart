@@ -4,6 +4,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'razorpay_service.dart';
 import '../checkout/checkout_state.dart';
 import '../checkout/payment_result_screen.dart';
+import 'order_service.dart';
 
 /// Comprehensive payment service that handles the complete payment flow
 class PaymentService {
@@ -12,6 +13,7 @@ class PaymentService {
   PaymentService._internal();
 
   final RazorpayService _razorpayService = RazorpayService();
+  String? _currentOrderId; // our app's order id
 
   /// Process payment with comprehensive error handling and user feedback
   Future<void> processPayment({
@@ -47,7 +49,14 @@ class PaymentService {
         debugPrint('User: ${billingDetails.name} (${billingDetails.email})');
       }
 
-      // Create order on server
+      // Create application pending order in Supabase
+      final orderService = OrderService(Supabase.instance.client);
+      _currentOrderId = await orderService.createPendingOrder(
+        checkout: checkoutState,
+        extra: {'source': 'user_app'},
+      );
+
+      // Create gateway order on server (Edge Function or direct HTTP)
       final order = await _razorpayService.createOrderOnServer(
         amountInPaise: amountPaise,
         currency: 'INR',
@@ -63,6 +72,13 @@ class PaymentService {
           'event_date': billingDetails.eventDate?.toIso8601String(),
           'message_to_vendor': billingDetails.messageToVendor,
         },
+      );
+
+      // Attach gateway order id to our order
+      await orderService.attachRazorpayOrder(
+        orderId: _currentOrderId!,
+        razorpayOrderId: order['id'] as String,
+        amountPaise: amountPaise,
       );
 
       // Initialize Razorpay
@@ -131,6 +147,16 @@ class PaymentService {
       debugPrint('Response data: $responseData');
     }
 
+    // Mark order paid
+    final orderService = OrderService(Supabase.instance.client);
+    if (_currentOrderId != null) {
+      orderService.markPaid(
+        orderId: _currentOrderId!,
+        paymentId: paymentId,
+        gatewayResponse: responseData,
+      );
+    }
+
     // Show success screen
     Navigator.of(context).push(
       MaterialPageRoute(
@@ -160,6 +186,17 @@ class PaymentService {
     if (kDebugMode) {
       debugPrint('Payment failed: $code - $message');
       debugPrint('Error data: $errorData');
+    }
+
+    // Mark order failed
+    final orderService = OrderService(Supabase.instance.client);
+    if (_currentOrderId != null) {
+      orderService.markFailed(
+        orderId: _currentOrderId!,
+        code: code,
+        message: message,
+        errorData: errorData,
+      );
     }
 
     // Show error screen

@@ -26,6 +26,9 @@
       "@/lib/*": [
         "./src/lib/*"
       ],
+      "@/contexts/*": [
+        "./src/contexts/*"
+      ],
       "@/app/*": [
         "./src/app/*"
       ]

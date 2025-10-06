@@ -16,6 +16,7 @@ class ChecklistScreen extends StatefulWidget {
 class _ChecklistScreenState extends State<ChecklistScreen> {
   late final EventPlanningService _eventService;
   final TextEditingController _taskController = TextEditingController();
+  List<Event> _allEvents = [];
   
   List<ChecklistTask> _tasks = [];
   bool _isLoading = true;
@@ -26,6 +27,14 @@ class _ChecklistScreenState extends State<ChecklistScreen> {
     super.initState();
     _eventService = EventPlanningService(Supabase.instance.client);
     _loadTasks();
+    _loadEventsForSwitcher();
+  }
+
+  Future<void> _loadEventsForSwitcher() async {
+    try {
+      final events = await _eventService.getEvents();
+      if (mounted) setState(() { _allEvents = events; });
+    } catch (_) {}
   }
 
   @override
@@ -215,6 +224,52 @@ class _ChecklistScreenState extends State<ChecklistScreen> {
         ),
         backgroundColor: Colors.white,
         elevation: 0,
+        actions: [
+          PopupMenuButton<Event>(
+            tooltip: 'Switch Event',
+            child: Row(
+              children: [
+                ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 160),
+                  child: Text(
+                    widget.event.name,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(fontWeight: FontWeight.w600),
+                  ),
+                ),
+                const SizedBox(width: 4),
+                const Icon(Icons.arrow_drop_down),
+                const SizedBox(width: 8),
+              ],
+            ),
+            onSelected: (ev) {
+              if (ev.id == widget.event.id) return;
+              Navigator.of(context).pushReplacement(
+                MaterialPageRoute(builder: (_) => ChecklistScreen(event: ev)),
+              );
+            },
+            itemBuilder: (context) {
+              if (_allEvents.isEmpty) {
+                return [
+                  const PopupMenuItem<Event>(
+                    enabled: false,
+                    child: Text('No events found'),
+                  ),
+                ];
+              }
+              return _allEvents.map((e) => PopupMenuItem<Event>(
+                value: e,
+                child: Row(
+                  children: [
+                    Icon(e.type.icon, color: e.type.color, size: 18),
+                    const SizedBox(width: 8),
+                    Expanded(child: Text(e.name, overflow: TextOverflow.ellipsis)),
+                  ],
+                ),
+              )).toList();
+            },
+          ),
+        ],
       ),
       body: Column(
         children: [

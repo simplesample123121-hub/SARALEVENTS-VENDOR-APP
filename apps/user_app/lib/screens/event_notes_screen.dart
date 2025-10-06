@@ -15,6 +15,7 @@ class EventNotesScreen extends StatefulWidget {
 class _EventNotesScreenState extends State<EventNotesScreen> {
   late final EventPlanningService _eventService;
   List<EventNote> _notes = [];
+  List<Event> _allEvents = [];
   bool _isLoading = true;
   String? _error;
 
@@ -23,6 +24,14 @@ class _EventNotesScreenState extends State<EventNotesScreen> {
     super.initState();
     _eventService = EventPlanningService(Supabase.instance.client);
     _loadNotes();
+    _loadEventsForSwitcher();
+  }
+
+  Future<void> _loadEventsForSwitcher() async {
+    try {
+      final events = await _eventService.getEvents();
+      if (mounted) setState(() { _allEvents = events; });
+    } catch (_) {}
   }
 
   Future<void> _loadNotes() async {
@@ -55,6 +64,49 @@ class _EventNotesScreenState extends State<EventNotesScreen> {
       appBar: AppBar(
         title: const Text('Event Notes'),
         actions: [
+          PopupMenuButton<Event>(
+            tooltip: 'Switch Event',
+            child: Row(
+              children: [
+                ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 160),
+                  child: Text(
+                    widget.event.name,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(fontWeight: FontWeight.w600),
+                  ),
+                ),
+                const SizedBox(width: 4),
+                const Icon(Icons.arrow_drop_down),
+                const SizedBox(width: 8),
+              ],
+            ),
+            onSelected: (ev) {
+              if (ev.id == widget.event.id) return;
+              Navigator.of(context).pushReplacement(
+                MaterialPageRoute(builder: (_) => EventNotesScreen(event: ev)),
+              );
+            },
+            itemBuilder: (context) {
+              return <PopupMenuEntry<Event>>[
+                const PopupMenuItem<Event>(
+                  enabled: false,
+                  child: Text('Select Event'),
+                ),
+                const PopupMenuDivider(),
+                ..._allEvents.map((e) => PopupMenuItem<Event>(
+                  value: e,
+                  child: Row(
+                    children: [
+                      Icon(e.type.icon, color: e.type.color, size: 18),
+                      const SizedBox(width: 8),
+                      Expanded(child: Text(e.name, overflow: TextOverflow.ellipsis)),
+                    ],
+                  ),
+                )),
+              ];
+            },
+          ),
           IconButton(
             icon: const Icon(Icons.add),
             onPressed: () => _showAddNoteDialog(),

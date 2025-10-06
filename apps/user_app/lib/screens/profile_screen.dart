@@ -63,13 +63,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
           : ListView(
               padding: const EdgeInsets.all(16),
               children: [
-                ListTile(
-                  leading: const Icon(Icons.card_giftcard),
-                  title: const Text('My E-Invitations'),
-                  trailing: const Icon(Icons.chevron_right),
-                  onTap: () => GoRouter.of(context).push('/invites'),
-                ),
-                const Divider(),
                 Center(
                   child: Builder(builder: (context) {
                     final authMeta = user?.userMetadata ?? {};
@@ -95,6 +88,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   ),
                 ),
                 const SizedBox(height: 24),
+                ListTile(
+                  leading: const Icon(Icons.card_giftcard),
+                  title: const Text('My E-Invitations'),
+                  trailing: const Icon(Icons.chevron_right),
+                  onTap: () => GoRouter.of(context).push('/invites'),
+                ),
+                const Divider(),
                 ListTile(
                   leading: const Icon(Icons.badge_outlined),
                   title: const Text('Profile Details'),

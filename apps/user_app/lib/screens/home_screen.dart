@@ -226,16 +226,7 @@ class _HomeScreenState extends State<HomeScreen> with RouteAware {
               // Hero banner
               _buildHeroBanner(),
               const SizedBox(height: 24),
-              
-              // Categories section
-              _buildCategoriesSection(),
-              const SizedBox(height: 24),
-              
-              // Events section
-              const EventsSection(),
-              const SizedBox(height: 24),
-
-              // Quick create invitation CTA
+              // Quick create invitation CTA moved just below banner
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 20),
                 child: GestureDetector(
@@ -262,6 +253,14 @@ class _HomeScreenState extends State<HomeScreen> with RouteAware {
                   ),
                 ),
               ),
+              const SizedBox(height: 24),
+              
+              // Categories section
+              _buildCategoriesSection(),
+              const SizedBox(height: 24),
+              
+              // Events section
+              const EventsSection(),
               const SizedBox(height: 24),
               
               // Enhanced Events section with real-time updates

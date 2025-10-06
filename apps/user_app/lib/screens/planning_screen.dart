@@ -6,6 +6,26 @@ import '../models/event_planning_models.dart';
 import '../services/event_planning_service.dart';
 import 'event_details_screen.dart';
 import 'create_event_screen.dart';
+import 'budget_tracking_screen.dart';
+import 'event_notes_screen.dart';
+import 'checklist_screen.dart';
+import 'guest_list_screen.dart';
+import 'invitations_list_screen.dart';
+
+// Simple value class for grid items
+class _Tool {
+  final IconData icon;
+  final String label;
+  final Color color;
+  final VoidCallback onTap;
+
+  _Tool({
+    required this.icon,
+    required this.label,
+    required this.color,
+    required this.onTap,
+  });
+}
 
 class PlanningScreen extends StatefulWidget {
   const PlanningScreen({super.key});
@@ -17,7 +37,7 @@ class PlanningScreen extends StatefulWidget {
 class _PlanningScreenState extends State<PlanningScreen>
     with SingleTickerProviderStateMixin {
   late final EventPlanningService _eventService;
-  late TabController _tabController;
+  
   
   List<Event> _allEvents = [];
   List<Event> _upcomingEvents = [];
@@ -29,13 +49,13 @@ class _PlanningScreenState extends State<PlanningScreen>
   void initState() {
     super.initState();
     _eventService = EventPlanningService(Supabase.instance.client);
-    _tabController = TabController(length: 2, vsync: this);
     _loadEvents();
   }
 
+  
+
   @override
   void dispose() {
-    _tabController.dispose();
     super.dispose();
   }
 
@@ -182,34 +202,17 @@ class _PlanningScreenState extends State<PlanningScreen>
         ),
         backgroundColor: Colors.white,
         elevation: 0,
-        bottom: TabBar(
-          controller: _tabController,
-          labelColor: const Color(0xFFFDBB42),
-          unselectedLabelColor: Colors.grey,
-          indicatorColor: const Color(0xFFFDBB42),
-          labelStyle: const TextStyle(
-            fontWeight: FontWeight.w600,
-            fontSize: 16,
-          ),
-          tabs: [
-            Tab(
-              text: 'Upcoming (${_upcomingEvents.length})',
-            ),
-            Tab(
-              text: 'Previous (${_previousEvents.length})',
-            ),
-          ],
-        ),
       ),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
           : _error != null
               ? _buildErrorState()
-              : TabBarView(
-                  controller: _tabController,
+              : Column(
                   children: [
-                    _buildEventsList(_upcomingEvents, isUpcoming: true),
-                    _buildEventsList(_previousEvents, isUpcoming: false),
+                    _buildPlanningTools(),
+                    Expanded(
+                      child: _buildTimelineEventsList(),
+                    ),
                   ],
                 ),
       floatingActionButton: FloatingActionButton.extended(
@@ -221,6 +224,232 @@ class _PlanningScreenState extends State<PlanningScreen>
           'New Event',
           style: TextStyle(fontWeight: FontWeight.w600),
         ),
+      ),
+    );
+  }
+
+  Widget _buildPlanningTools() {
+    final List<_Tool> tools = [
+      _Tool(icon: Icons.account_balance_wallet, label: 'Budget', color: Colors.blue, onTap: _openBudget),
+      _Tool(icon: Icons.note_alt, label: 'Notes', color: Colors.purple, onTap: _openNotes),
+      _Tool(icon: Icons.checklist, label: 'Tasks', color: Colors.green, onTap: _openChecklist),
+      _Tool(icon: Icons.group, label: 'Guests', color: Colors.teal, onTap: _openGuests),
+      _Tool(icon: Icons.mail_outline, label: 'Invites', color: Colors.orange, onTap: _openInvites),
+    ];
+    
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final double width = constraints.maxWidth;
+        final int crossAxisCount = width >= 900 ? 3 : 2;
+        final double containerPadding = width >= 700 ? 20 : 16;
+        final double spacing = width >= 700 ? 16 : 12;
+        final double childAspectRatio = width >= 700 ? 4.2 : 3.8;
+
+        return Container(
+          margin: EdgeInsets.all(containerPadding),
+          padding: EdgeInsets.all(containerPadding),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(16),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.05),
+                blurRadius: 10,
+                offset: const Offset(0, 2),
+              ),
+            ],
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                'Planning Tools',
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              SizedBox(height: spacing),
+              GridView.count(
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                crossAxisCount: crossAxisCount,
+                mainAxisSpacing: spacing,
+                crossAxisSpacing: spacing,
+                childAspectRatio: childAspectRatio,
+                children: tools.map((t) => _buildToolCard(
+                  icon: t.icon,
+                  label: t.label,
+                  color: t.color,
+                  onTap: t.onTap,
+                )).toList(),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildToolCard({
+    required IconData icon,
+    required String label,
+    required Color color,
+    required VoidCallback onTap,
+  }) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(12),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+        decoration: BoxDecoration(
+          color: color.withValues(alpha: 0.08),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: color.withValues(alpha: 0.2)),
+        ),
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(minHeight: 56),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: color.withValues(alpha: 0.15),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Icon(icon, color: color, size: 20),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  label,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    color: color,
+                    fontSize: 15,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+              Icon(Icons.north_east, size: 18, color: color),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Future<void> _openBudget() async {
+    final event = await _promptSelectEvent();
+    if (event == null) return;
+    // Navigate to budget screen
+    // ignore: use_build_context_synchronously
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => BudgetTrackingScreen(event: event),
+      ),
+    );
+  }
+
+  Future<void> _openNotes() async {
+    final event = await _promptSelectEvent();
+    if (event == null) return;
+    // ignore: use_build_context_synchronously
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => EventNotesScreen(event: event),
+      ),
+    );
+  }
+
+  Future<void> _openChecklist() async {
+    final event = await _promptSelectEvent();
+    if (event == null) return;
+    // ignore: use_build_context_synchronously
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => ChecklistScreen(event: event),
+      ),
+    );
+  }
+
+  Future<void> _openGuests() async {
+    final event = await _promptSelectEvent();
+    if (event == null) return;
+    // ignore: use_build_context_synchronously
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => GuestListScreen(event: event),
+      ),
+    );
+  }
+
+  Future<Event?> _promptSelectEvent() async {
+    // Prefer upcoming events first; if none, allow choosing from all
+    final selectable = _upcomingEvents.isNotEmpty ? _upcomingEvents : _allEvents;
+    if (selectable.isEmpty) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Create an event first to use planning tools.')),
+        );
+      }
+      return null;
+    }
+
+    if (selectable.length == 1) {
+      return selectable.first;
+    }
+
+    return showModalBottomSheet<Event>(
+      context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      builder: (context) {
+        return SafeArea(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Padding(
+                padding: const EdgeInsets.all(16),
+                child: Text(
+                  'Select Event',
+                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.bold,
+                      ),
+                ),
+              ),
+              const Divider(height: 1),
+              Flexible(
+                child: ListView.separated(
+                  shrinkWrap: true,
+                  itemCount: selectable.length,
+                  separatorBuilder: (_, __) => const Divider(height: 1),
+                  itemBuilder: (context, index) {
+                    final e = selectable[index];
+                    return ListTile(
+                      title: Text(e.name),
+                      subtitle: Text('${e.date.day}/${e.date.month}/${e.date.year}'),
+                      leading: Icon(e.type.icon, color: e.type.color),
+                      onTap: () => Navigator.pop(context, e),
+                    );
+                  },
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  void _openInvites() {
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => const InvitationsListScreen(),
       ),
     );
   }
@@ -268,6 +497,32 @@ class _PlanningScreenState extends State<PlanningScreen>
         itemCount: events.length,
         itemBuilder: (context, index) {
           final event = events[index];
+          return _buildEventCard(event, isUpcoming: isUpcoming);
+        },
+      ),
+    );
+  }
+
+  Widget _buildTimelineEventsList() {
+    // Compose a single list: upcoming (soonest first), then previous (most recent past first)
+    final List<Event> upcomingSorted = List<Event>.from(_upcomingEvents)
+      ..sort((a, b) => a.date.compareTo(b.date));
+    final List<Event> previousSorted = List<Event>.from(_previousEvents)
+      ..sort((a, b) => b.date.compareTo(a.date));
+    final List<Event> timeline = [...upcomingSorted, ...previousSorted];
+
+    if (timeline.isEmpty) {
+      return _buildEmptyState(true);
+    }
+
+    return RefreshIndicator(
+      onRefresh: _loadEvents,
+      child: ListView.builder(
+        padding: const EdgeInsets.all(16),
+        itemCount: timeline.length,
+        itemBuilder: (context, index) {
+          final event = timeline[index];
+          final bool isUpcoming = event.date.isAfter(DateTime.now());
           return _buildEventCard(event, isUpcoming: isUpcoming);
         },
       ),

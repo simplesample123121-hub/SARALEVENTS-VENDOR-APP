@@ -1,10 +1,13 @@
 "use client"
 import { useState } from 'react'
 import Link from 'next/link'
-import { createClient } from '@/lib/supabase'
+import { useAuth } from '@/contexts/AuthContext'
+import { Button } from '@/components/ui/Button'
+import { Input } from '@/components/ui/Input'
+import { ProtectedRoute } from '@/components/auth/ProtectedRoute'
 
 export default function ForgotPasswordPage() {
-  const supabase = createClient()
+  const { resetPassword } = useAuth()
   const [email, setEmail] = useState('')
   const [loading, setLoading] = useState(false)
   const [message, setMessage] = useState<string | null>(null)
@@ -15,29 +18,77 @@ export default function ForgotPasswordPage() {
     setLoading(true)
     setError(null)
     setMessage(null)
-    const { error } = await supabase.auth.resetPasswordForEmail(email, {
-      redirectTo: `${location.origin}/reset-password`,
-    })
+    
+    const { error } = await resetPassword(email)
     setLoading(false)
-    if (error) setError(error.message)
-    else setMessage('Check your email for a password reset link.')
+    
+    if (error) {
+      setError(error.message)
+    } else {
+      setMessage('Check your email for a password reset link.')
+    }
   }
 
   return (
-    <main className="min-h-screen flex items-center justify-center p-6">
-      <form onSubmit={onSubmit} className="max-w-sm w-full bg-white rounded-xl p-6 shadow">
-        <h1 className="text-xl font-bold mb-4">Forgot password</h1>
-        <div className="space-y-3">
-          <input value={email} onChange={e=>setEmail(e.target.value)} type="email" placeholder="Email" required className="w-full border rounded-md p-2" />
-          {error && <p className="text-red-600 text-sm">{error}</p>}
-          {message && <p className="text-green-700 text-sm">{message}</p>}
-          <button disabled={loading} className="w-full bg-black text-white rounded-md py-2">{loading ? 'Sending...' : 'Send reset link'}</button>
+    <ProtectedRoute requireAuth={false}>
+      <div className="min-h-screen flex items-center justify-center bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
+        <div className="max-w-md w-full space-y-8">
+          <div>
+            <h2 className="mt-6 text-center text-3xl font-extrabold text-gray-900">
+              Reset your password
+            </h2>
+            <p className="mt-2 text-center text-sm text-gray-600">
+              Enter your email address and we'll send you a link to reset your password.
+            </p>
+          </div>
+          
+          <form className="mt-8 space-y-6" onSubmit={onSubmit}>
+            <div>
+              <Input
+                label="Email address"
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                placeholder="Enter your email"
+                required
+              />
+            </div>
+
+            {error && (
+              <div className="bg-red-50 border border-red-200 text-red-600 px-4 py-3 rounded-md text-sm">
+                {error}
+              </div>
+            )}
+
+            {message && (
+              <div className="bg-green-50 border border-green-200 text-green-600 px-4 py-3 rounded-md text-sm">
+                {message}
+              </div>
+            )}
+
+            <div>
+              <Button
+                type="submit"
+                className="w-full"
+                loading={loading}
+                disabled={loading}
+              >
+                Send reset link
+              </Button>
+            </div>
+
+            <div className="text-center">
+              <Link
+                href="/signin"
+                className="text-sm text-indigo-600 hover:text-indigo-500"
+              >
+                Back to sign in
+              </Link>
+            </div>
+          </form>
         </div>
-        <div className="mt-4 text-sm text-gray-600">
-          <Link href="/signin" className="hover:underline">Back to sign in</Link>
-        </div>
-      </form>
-    </main>
+      </div>
+    </ProtectedRoute>
   )
 }
 
