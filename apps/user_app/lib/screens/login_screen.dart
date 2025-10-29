@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 import 'package:flutter_svg/flutter_svg.dart';
+import 'package:flutter/services.dart';
 import '../core/session.dart';
 
 class LoginScreen extends StatefulWidget {
@@ -17,6 +18,7 @@ class _LoginScreenState extends State<LoginScreen> {
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
   bool _isLoading = false;
+  bool _showPassword = false;
 
   @override
   void dispose() {
@@ -131,13 +133,31 @@ class _LoginScreenState extends State<LoginScreen> {
                         controller: _emailController,
                         decoration: const InputDecoration(labelText: 'Email'),
                         keyboardType: TextInputType.emailAddress,
-                        validator: (v) => (v == null || v.isEmpty) ? 'Enter email' : null,
+                        inputFormatters: [
+                          FilteringTextInputFormatter.allow(RegExp(r'[A-Za-z0-9@\.]')),
+                        ],
+                        validator: (v) {
+                          if (v == null || v.trim().isEmpty) return 'Enter email';
+                          final value = v.trim();
+                          // Only letters, numbers, '@' and '.' in a basic email shape
+                          final emailRegex = RegExp(r'^[A-Za-z0-9]+@[A-Za-z0-9]+(\.[A-Za-z]{2,})+$');
+                          if (!emailRegex.hasMatch(value)) {
+                            return 'Enter a valid email address';
+                          }
+                          return null;
+                        },
                       ),
                       const SizedBox(height: 12),
                       TextFormField(
                         controller: _passwordController,
-                        decoration: const InputDecoration(labelText: 'Password'),
-                        obscureText: true,
+                        decoration: InputDecoration(
+                          labelText: 'Password',
+                          suffixIcon: IconButton(
+                            icon: Icon(_showPassword ? Icons.visibility_off : Icons.visibility),
+                            onPressed: () => setState(() => _showPassword = !_showPassword),
+                          ),
+                        ),
+                        obscureText: !_showPassword,
                         validator: (v) => (v == null || v.length < 6) ? 'Min 6 chars' : null,
                       ),
                       const SizedBox(height: 16),

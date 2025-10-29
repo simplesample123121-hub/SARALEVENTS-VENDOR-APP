@@ -6,6 +6,7 @@ import '../core/session.dart';
 import '../services/profile_service.dart';
 import 'package:image_picker/image_picker.dart' as img;
 import 'dart:io';
+import '../core/input_formatters.dart';
 
 class ProfileDetailsScreen extends StatefulWidget {
   const ProfileDetailsScreen({super.key});
@@ -164,22 +165,6 @@ class _ProfileDetailsScreenState extends State<ProfileDetailsScreen> {
                                       ? const Icon(Icons.person, size: 44, color: Colors.black54)
                                       : null,
                                 ),
-                                Positioned(
-                                  right: 0,
-                                  bottom: 0,
-                                  child: IconButton(
-                                    onPressed: _uploadingImage ? null : _pickAndUploadImage,
-                                    iconSize: 22,
-                                    padding: const EdgeInsets.all(6),
-                                    constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
-                                    style: IconButton.styleFrom(
-                                      backgroundColor: Theme.of(context).colorScheme.primary,
-                                    ),
-                                    icon: _uploadingImage
-                                        ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-                                        : const Icon(Icons.edit, color: Colors.white),
-                                  ),
-                                ),
                               ],
                             ),
                           ),
@@ -198,19 +183,27 @@ class _ProfileDetailsScreenState extends State<ProfileDetailsScreen> {
                         TextFormField(
                           controller: _firstNameController,
                           decoration: const InputDecoration(labelText: 'First name'),
-                          validator: (v) => (v == null || v.trim().isEmpty) ? 'Enter first name' : null,
+                          inputFormatters: [LettersSpacesTextInputFormatter()],
+                          textCapitalization: TextCapitalization.words,
+                          keyboardType: TextInputType.name,
+                          validator: Validators.personNameLettersSpaces,
                         ),
                         const SizedBox(height: 12),
                         TextFormField(
                           controller: _lastNameController,
                           decoration: const InputDecoration(labelText: 'Last name'),
-                          validator: (v) => (v == null || v.trim().isEmpty) ? 'Enter last name' : null,
+                          inputFormatters: [LettersSpacesTextInputFormatter()],
+                          textCapitalization: TextCapitalization.words,
+                          keyboardType: TextInputType.name,
+                          validator: Validators.personNameLettersSpaces,
                         ),
                         const SizedBox(height: 12),
                         TextFormField(
                           controller: _phoneController,
                           decoration: const InputDecoration(labelText: 'Phone number'),
                           keyboardType: TextInputType.phone,
+                          inputFormatters: [E164PhoneInputFormatter(maxLength: 15)],
+                          validator: Validators.phone,
                         ),
                         const SizedBox(height: 16),
                         SizedBox(

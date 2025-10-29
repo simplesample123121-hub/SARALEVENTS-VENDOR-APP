@@ -391,8 +391,9 @@ class _ChecklistScreenState extends State<ChecklistScreen> {
               decoration: const InputDecoration(
                 hintText: 'Add a new task...',
                 border: InputBorder.none,
-                contentPadding: EdgeInsets.zero,
+                contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
               ),
+              style: const TextStyle(fontSize: 16),
               onSubmitted: (_) => _addTask(),
             ),
           ),

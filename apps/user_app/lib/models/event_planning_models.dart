@@ -171,6 +171,7 @@ class Event {
   final double? spentAmount;
   final int? expectedGuests;
   final int? actualGuests;
+  final int? parkingCapacity;
   final bool isPublic;
   final bool isArchived;
   final List<String> sharedWith;
@@ -194,6 +195,7 @@ class Event {
     this.spentAmount,
     this.expectedGuests,
     this.actualGuests,
+    this.parkingCapacity,
     this.isPublic = false,
     this.isArchived = false,
     this.sharedWith = const [],
@@ -229,6 +231,7 @@ class Event {
     double? spentAmount,
     int? expectedGuests,
     int? actualGuests,
+    int? parkingCapacity,
     bool? isPublic,
     bool? isArchived,
     List<String>? sharedWith,
@@ -252,6 +255,7 @@ class Event {
       spentAmount: spentAmount ?? this.spentAmount,
       expectedGuests: expectedGuests ?? this.expectedGuests,
       actualGuests: actualGuests ?? this.actualGuests,
+      parkingCapacity: parkingCapacity ?? this.parkingCapacity,
       isPublic: isPublic ?? this.isPublic,
       isArchived: isArchived ?? this.isArchived,
       sharedWith: sharedWith ?? this.sharedWith,
@@ -278,6 +282,7 @@ class Event {
       'spent_amount': spentAmount,
       'expected_guests': expectedGuests,
       'actual_guests': actualGuests,
+      'parking_cap': parkingCapacity,
       'is_public': isPublic,
       'is_archived': isArchived,
       'shared_with': sharedWith,
@@ -304,6 +309,7 @@ class Event {
       spentAmount: json['spent_amount']?.toDouble() ?? json['spentAmount']?.toDouble(),
       expectedGuests: json['expected_guests'] ?? json['expectedGuests'],
       actualGuests: json['actual_guests'],
+      parkingCapacity: json['parking_cap'] ?? json['parking_capacity'] ?? json['parkingCapacity'],
       isPublic: json['is_public'] ?? false,
       isArchived: json['is_archived'] ?? false,
       sharedWith: List<String>.from(json['shared_with'] ?? []),

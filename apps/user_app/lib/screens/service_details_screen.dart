@@ -759,12 +759,28 @@ class _ServiceDetailsScreenState extends State<ServiceDetailsScreen>
           const SizedBox(height: 24),
           
           // Reviews List
-          const Text(
-            'Customer Reviews',
-            style: TextStyle(
-              fontSize: 18,
-              fontWeight: FontWeight.bold,
-            ),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              const Text(
+                'Customer Reviews',
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              ElevatedButton.icon(
+                onPressed: () => _showAddReviewDialog(service),
+                icon: const Icon(Icons.add, size: 18),
+                label: const Text('Add Review'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFFFDBB42),
+                  foregroundColor: Colors.black87,
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  textStyle: const TextStyle(fontSize: 14),
+                ),
+              ),
+            ],
           ),
           const SizedBox(height: 16),
           
@@ -1410,6 +1426,186 @@ class _ServiceDetailsScreenState extends State<ServiceDetailsScreen>
         );
       }
     }
+  }
+
+  void _showAddReviewDialog(ServiceItem service) {
+    showDialog(
+      context: context,
+      builder: (context) {
+        final formKey = GlobalKey<FormState>();
+        final reviewController = TextEditingController();
+        int selectedRating = 5;
+        final nameController = TextEditingController();
+
+        return StatefulBuilder(
+          builder: (context, setDialogState) => Dialog(
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+            child: Container(
+              constraints: const BoxConstraints(maxHeight: 500),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  // Header
+                  Container(
+                    padding: const EdgeInsets.all(20),
+                    decoration: const BoxDecoration(
+                      color: Color(0xFFFDBB42),
+                      borderRadius: BorderRadius.only(
+                        topLeft: Radius.circular(16),
+                        topRight: Radius.circular(16),
+                      ),
+                    ),
+                    child: Row(
+                      children: [
+                        const Expanded(
+                          child: Text(
+                            'Add Review',
+                            style: TextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.black87,
+                            ),
+                          ),
+                        ),
+                        IconButton(
+                          onPressed: () => Navigator.pop(context),
+                          icon: const Icon(Icons.close, color: Colors.black87),
+                        ),
+                      ],
+                    ),
+                  ),
+                  
+                  // Form
+                  Flexible(
+                    child: SingleChildScrollView(
+                      padding: const EdgeInsets.all(20),
+                      child: Form(
+                        key: formKey,
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            // Service Name
+                            Text(
+                              'Reviewing: ${service.name}',
+                          style: const TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w500,
+                            color: Colors.grey,
+                          ),
+                        ),
+                        const SizedBox(height: 20),
+                        
+                        // Your Name
+                        TextFormField(
+                          controller: nameController,
+                          decoration: const InputDecoration(
+                            labelText: 'Your Name *',
+                            border: OutlineInputBorder(),
+                          ),
+                          validator: (value) {
+                            if (value == null || value.trim().isEmpty) {
+                              return 'Please enter your name';
+                            }
+                            return null;
+                          },
+                        ),
+                        const SizedBox(height: 16),
+                        
+                        // Rating
+                        const Text(
+                          'Rating *',
+                          style: TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: List.generate(5, (index) {
+                            return IconButton(
+                              onPressed: () {
+                                setDialogState(() {
+                                  selectedRating = index + 1;
+                                });
+                              },
+                              icon: Icon(
+                                Icons.star,
+                                size: 36,
+                                color: index < selectedRating
+                                    ? Colors.amber
+                                    : Colors.grey.shade300,
+                              ),
+                            );
+                          }),
+                        ),
+                        const SizedBox(height: 16),
+                        
+                        // Review
+                        TextFormField(
+                          controller: reviewController,
+                          decoration: const InputDecoration(
+                            labelText: 'Write your review *',
+                            border: OutlineInputBorder(),
+                            hintText: 'Share your experience...',
+                            alignLabelWithHint: true,
+                          ),
+                          maxLines: 5,
+                          validator: (value) {
+                            if (value == null || value.trim().isEmpty) {
+                              return 'Please write your review';
+                            }
+                            return null;
+                          },
+                        ),
+                        
+                        const SizedBox(height: 24),
+                        
+                        // Action Buttons
+                        Row(
+                          children: [
+                            Expanded(
+                              child: OutlinedButton(
+                                onPressed: () => Navigator.pop(context),
+                                child: const Text('Cancel'),
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: ElevatedButton(
+                                onPressed: () {
+                                  if (formKey.currentState!.validate()) {
+                                    Navigator.pop(context);
+                                    // TODO: Save review to database
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      const SnackBar(
+                                        content: Text('Review submitted successfully!'),
+                                        backgroundColor: Colors.green,
+                                      ),
+                                    );
+                                  }
+                                },
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: const Color(0xFFFDBB42),
+                                  foregroundColor: Colors.black87,
+                                ),
+                                child: const Text('Submit'),
+                              ),
+                            ),
+                          ],
+                        ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        );
+      },
+    );
   }
 
   void _showAllReviews(ServiceItem service) {

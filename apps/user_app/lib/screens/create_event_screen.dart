@@ -24,6 +24,7 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
   final _venueController = TextEditingController();
   final _budgetController = TextEditingController();
   final _guestCountController = TextEditingController();
+  final _parkingCapacityController = TextEditingController();
   
   // Form state
   EventType _selectedType = EventType.birthday;
@@ -49,6 +50,7 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
     _venueController.dispose();
     _budgetController.dispose();
     _guestCountController.dispose();
+    _parkingCapacityController.dispose();
     super.dispose();
   }
 
@@ -58,6 +60,7 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
     _venueController.text = event.venue ?? '';
     _budgetController.text = event.budget?.toString() ?? '';
     _guestCountController.text = event.expectedGuests?.toString() ?? '';
+    _parkingCapacityController.text = event.parkingCapacity?.toString() ?? '';
     
     _selectedType = event.type;
     _selectedDate = event.date;
@@ -180,6 +183,9 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
         expectedGuests: _guestCountController.text.trim().isEmpty 
             ? null 
             : int.tryParse(_guestCountController.text.trim()),
+        parkingCapacity: _parkingCapacityController.text.trim().isEmpty
+            ? null
+            : int.tryParse(_parkingCapacityController.text.trim()),
         createdAt: widget.event?.createdAt ?? DateTime.now(),
         updatedAt: DateTime.now(),
       );
@@ -334,6 +340,23 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
                     inputFormatters: [FilteringTextInputFormatter.digitsOnly],
                   ),
                 ),
+              ],
+            ),
+            const SizedBox(height: 16),
+            Row(
+              children: [
+                Expanded(
+                  child: _buildTextField(
+                    controller: _parkingCapacityController,
+                    label: 'Parking Capacity',
+                    hint: '0',
+                    icon: Icons.local_parking,
+                    keyboardType: TextInputType.number,
+                    inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                  ),
+                ),
+                const SizedBox(width: 12),
+                const Expanded(child: SizedBox()),
               ],
             ),
             const SizedBox(height: 16),
@@ -522,7 +545,6 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
         value: _selectedType,
         decoration: InputDecoration(
           labelText: 'Event Type',
-          prefixIcon: Icon(_selectedType.icon, color: _selectedType.color),
           border: OutlineInputBorder(
             borderRadius: BorderRadius.circular(12),
             borderSide: BorderSide.none,
@@ -645,7 +667,6 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
         value: _paymentStatus,
         decoration: InputDecoration(
           labelText: 'Payment Status',
-          prefixIcon: Icon(_paymentStatus.icon, color: _paymentStatus.color),
           border: OutlineInputBorder(
             borderRadius: BorderRadius.circular(12),
             borderSide: BorderSide.none,

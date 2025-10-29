@@ -18,6 +18,8 @@ import '../screens/invitation_preview_screen.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../screens/select_location_screen.dart';
 import '../screens/map_location_picker.dart';
+import '../screens/all_categories_screen.dart';
+import '../screens/all_events_screen.dart';
 
 
 class AppRouter {
@@ -87,7 +89,9 @@ class AppRouter {
           redirect: (ctx, state) {
             final s = Provider.of<UserSession>(ctx, listen: false);
             if (s.isPasswordRecovery) return '/auth/reset';
-            // Authenticated users should not see onboarding
+            // If onboarding already completed, go to pre-auth
+            if (s.isOnboardingComplete) return '/auth/pre';
+            // Authenticated users should go to app
             if (s.isAuthenticated) return '/app';
             return null;
           },
@@ -137,6 +141,14 @@ class AppRouter {
         GoRoute(
           path: '/invite/:slug',
           builder: (ctx, st) => InvitationPreviewScreen(slug: st.pathParameters['slug']!),
+        ),
+        GoRoute(
+          path: '/categories',
+          builder: (_, __) => const AllCategoriesScreen(),
+        ),
+        GoRoute(
+          path: '/events',
+          builder: (_, __) => const AllEventsScreen(),
         ),
       ],
     );

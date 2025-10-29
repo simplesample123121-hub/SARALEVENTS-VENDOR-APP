@@ -173,6 +173,13 @@ class _EventDetailsScreenState extends State<EventDetailsScreen> {
             expandedHeight: 300,
             pinned: true,
             backgroundColor: _event.type.color,
+            leading: IconButton(
+              icon: const Icon(Icons.arrow_back, color: Colors.white),
+              onPressed: () => Navigator.maybePop(context),
+              style: IconButton.styleFrom(
+                backgroundColor: Colors.black.withValues(alpha: 0.5),
+              ),
+            ),
             flexibleSpace: FlexibleSpaceBar(
               background: _buildEventHeader(),
             ),
@@ -481,6 +488,37 @@ class _EventDetailsScreenState extends State<EventDetailsScreen> {
               ),
             ],
           ),
+
+          // Parking Capacity (if available)
+          if (_event.parkingCapacity != null) ...[
+            const SizedBox(height: 16),
+            Row(
+              children: [
+                const Icon(Icons.local_parking, color: Colors.grey),
+                const SizedBox(width: 12),
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'Parking Capacity',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: Colors.grey,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                    Text(
+                      '${_event.parkingCapacity} vehicles',
+                      style: const TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ],
         ],
       ),
     );

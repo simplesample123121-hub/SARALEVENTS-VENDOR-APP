@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 import '../core/session.dart';
+import '../core/input_formatters.dart';
 
 class RegisterScreen extends StatefulWidget {
   const RegisterScreen({super.key});
@@ -19,6 +21,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
   final _lastNameController = TextEditingController();
   final _phoneController = TextEditingController();
   bool _isLoading = false;
+  bool _showPassword = false;
+  bool _showConfirmPassword = false;
 
   @override
   void dispose() {
@@ -179,39 +183,68 @@ class _RegisterScreenState extends State<RegisterScreen> {
                       TextFormField(
                         controller: _firstNameController,
                         decoration: const InputDecoration(labelText: 'First Name'),
-                        validator: (v) => (v == null || v.isEmpty) ? 'Enter first name' : null,
+                        inputFormatters: [LettersSpacesTextInputFormatter()],
+                        textCapitalization: TextCapitalization.words,
+                        keyboardType: TextInputType.name,
+                        validator: Validators.personNameLettersSpaces,
                       ),
                       const SizedBox(height: 12),
                       TextFormField(
                         controller: _lastNameController,
                         decoration: const InputDecoration(labelText: 'Last Name'),
-                        validator: (v) => (v == null || v.isEmpty) ? 'Enter last name' : null,
+                        inputFormatters: [LettersSpacesTextInputFormatter()],
+                        textCapitalization: TextCapitalization.words,
+                        keyboardType: TextInputType.name,
+                        validator: Validators.personNameLettersSpaces,
                       ),
                       const SizedBox(height: 12),
                       TextFormField(
                         controller: _emailController,
                         decoration: const InputDecoration(labelText: 'Email'),
                         keyboardType: TextInputType.emailAddress,
-                        validator: (v) => (v == null || v.isEmpty) ? 'Enter email' : null,
+                        inputFormatters: [NoEmojiTextInputFormatter()],
+                        validator: Validators.email,
                       ),
                       const SizedBox(height: 12),
                       TextFormField(
                         controller: _phoneController,
                         decoration: const InputDecoration(labelText: 'Phone Number (Optional)'),
                         keyboardType: TextInputType.phone,
+                        inputFormatters: [
+                          FilteringTextInputFormatter.digitsOnly,
+                          LengthLimitingTextInputFormatter(10),
+                        ],
+                        validator: (v) {
+                          final t = (v ?? '').trim();
+                          if (t.isEmpty) return null; // optional
+                          if (t.length != 10) return 'Phone number must be exactly 10 digits';
+                          return null;
+                        },
                       ),
                       const SizedBox(height: 12),
                       TextFormField(
                         controller: _passwordController,
-                        decoration: const InputDecoration(labelText: 'Password'),
-                        obscureText: true,
+                        decoration: InputDecoration(
+                          labelText: 'Password',
+                          suffixIcon: IconButton(
+                            icon: Icon(_showPassword ? Icons.visibility_off : Icons.visibility),
+                            onPressed: () => setState(() => _showPassword = !_showPassword),
+                          ),
+                        ),
+                        obscureText: !_showPassword,
                         validator: (v) => (v == null || v.length < 6) ? 'Min 6 chars' : null,
                       ),
                       const SizedBox(height: 12),
                       TextFormField(
                         controller: _confirmPasswordController,
-                        decoration: const InputDecoration(labelText: 'Confirm Password'),
-                        obscureText: true,
+                        decoration: InputDecoration(
+                          labelText: 'Confirm Password',
+                          suffixIcon: IconButton(
+                            icon: Icon(_showConfirmPassword ? Icons.visibility_off : Icons.visibility),
+                            onPressed: () => setState(() => _showConfirmPassword = !_showConfirmPassword),
+                          ),
+                        ),
+                        obscureText: !_showConfirmPassword,
                         validator: (v) {
                           if (v == null || v.isEmpty) {
                             return 'Please confirm your password';

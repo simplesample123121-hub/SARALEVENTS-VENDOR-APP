@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'wishlist_notifier.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class UserSession extends ChangeNotifier {
   bool _isOnboardingComplete = false;
@@ -32,6 +33,12 @@ class UserSession extends ChangeNotifier {
 
   Future<void> _init() async {
     _isAuthenticated = Supabase.instance.client.auth.currentSession != null;
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      _isOnboardingComplete = prefs.getBool('onboarding_seen') ?? false;
+    } catch (_) {
+      _isOnboardingComplete = false;
+    }
     if (_isAuthenticated) {
       await _checkUserRole();
       await checkProfileSetup();
@@ -75,8 +82,14 @@ class UserSession extends ChangeNotifier {
     }
   }
 
-  void completeOnboarding() {
+  Future<void> completeOnboarding() async {
     _isOnboardingComplete = true;
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setBool('onboarding_seen', true);
+    } catch (_) {
+      // Ignore persistence errors; in-memory flag still advances the flow
+    }
     notifyListeners();
   }
 

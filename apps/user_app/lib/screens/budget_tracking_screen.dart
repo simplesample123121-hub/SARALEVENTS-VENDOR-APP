@@ -914,10 +914,22 @@ class _BudgetItemDialogState extends State<_BudgetItemDialog> {
                       TextFormField(
                         controller: _vendorContactController,
                         decoration: const InputDecoration(
-                          labelText: 'Vendor Contact',
+                          labelText: 'Vendor Contact (10 digits)',
                           border: OutlineInputBorder(),
                         ),
-                        keyboardType: TextInputType.phone,
+                        keyboardType: TextInputType.number,
+                        maxLength: 10,
+                        inputFormatters: [
+                          FilteringTextInputFormatter.digitsOnly,
+                        ],
+                        validator: (value) {
+                          if (value != null && value.trim().isNotEmpty) {
+                            if (value.length != 10) {
+                              return 'Contact number must be 10 digits';
+                            }
+                          }
+                          return null;
+                        },
                       ),
                       
                       const SizedBox(height: 16),

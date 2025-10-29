@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'checkout_state.dart';
+import 'package:flutter/services.dart';
+import '../core/input_formatters.dart';
 
 class InstallmentCard extends StatelessWidget {
   final List<double> installments; // length 3
@@ -106,11 +108,17 @@ class _BillingFormState extends State<BillingForm> {
       key: _formKey,
       child: Column(
         children: [
-          _field(_name, 'Full Name', TextInputType.name),
+          _field(_name, 'Full Name', TextInputType.name,
+              inputFormatters: [NoEmojiTextInputFormatter()],
+              validator: Validators.personName),
           const SizedBox(height: 12),
-          _field(_email, 'Email', TextInputType.emailAddress, validator: _validateEmail),
+          _field(_email, 'Email', TextInputType.emailAddress,
+              inputFormatters: [NoEmojiTextInputFormatter()],
+              validator: Validators.email),
           const SizedBox(height: 12),
-          _field(_phone, 'Phone', TextInputType.phone),
+          _field(_phone, 'Phone', TextInputType.phone,
+              inputFormatters: [E164PhoneInputFormatter(maxLength: 15)],
+              validator: Validators.phone),
           const SizedBox(height: 12),
           _dateField(context),
           const SizedBox(height: 12),
@@ -148,11 +156,7 @@ class _BillingFormState extends State<BillingForm> {
     }
   }
 
-  String? _validateEmail(String? value) {
-    if (value == null || value.trim().isEmpty) return 'Email required';
-    final ok = RegExp(r'^[^@\s]+@[^@\s]+\.[^@\s]+$').hasMatch(value.trim());
-    return ok ? null : 'Enter valid email';
-  }
+  // Removed custom email validator in favor of Validators.email
 
   Widget _dateField(BuildContext context) {
     return InkWell(
@@ -185,11 +189,12 @@ class _BillingFormState extends State<BillingForm> {
   }
 
   Widget _field(TextEditingController c, String label, TextInputType type,
-      {FormFieldValidator<String>? validator, int maxLines = 1, bool required = true}) {
+      {FormFieldValidator<String>? validator, int maxLines = 1, bool required = true, List<TextInputFormatter>? inputFormatters}) {
     return TextFormField(
       controller: c,
       keyboardType: type,
       maxLines: maxLines,
+      inputFormatters: inputFormatters,
       validator: (v) {
         if (!required) return null;
         if (v == null || v.trim().isEmpty) return '$label required';

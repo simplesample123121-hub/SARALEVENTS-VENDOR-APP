@@ -44,7 +44,7 @@ class BookingService {
         return [];
       }
 
-      // Get bookings with service information only (user_profiles join not available)
+      // Get bookings with service information only first
       final result = await _supabase
           .from('bookings')
           .select('''
@@ -60,12 +60,15 @@ class BookingService {
           .order('created_at', ascending: false);
 
       print('Found ${result.length} bookings for vendor $vendorId');
-      
-      // Transform the data for easier use
-      final bookings = result.map((booking) {
+
+      // Build a map of user_id -> basic placeholders first
+      final List<Map<String, dynamic>> bookings = [];
+      final Set<String> userIds = {};
+      for (final booking in result) {
         final service = booking['services'] as Map<String, dynamic>;
-        
-        return {
+        final String userId = booking['user_id'];
+        userIds.add(userId);
+        bookings.add({
           'id': booking['id'],
           'status': booking['status'],
           'amount': booking['amount'],
@@ -79,9 +82,39 @@ class BookingService {
           'customer_name': 'Customer (ID: ${booking['user_id']})',
           'customer_email': 'No email available',
           'customer_phone': 'No phone available',
-          'user_id': booking['user_id'],
-        };
-      }).toList();
+          'user_id': userId,
+        });
+      }
+
+      // Try to enrich with customer details from user_profiles in one batched call
+      try {
+        if (userIds.isNotEmpty) {
+          final profiles = await _supabase
+              .from('user_profiles')
+              .select('user_id, first_name, last_name, email, phone_number')
+              .inFilter('user_id', userIds.toList());
+
+          final Map<String, Map<String, dynamic>> profileByUserId = {
+            for (final p in profiles) (p['user_id'] as String): p
+          };
+
+          for (final booking in bookings) {
+            final String uid = booking['user_id'] as String;
+            final profile = profileByUserId[uid];
+            if (profile != null) {
+              final String firstName = (profile['first_name'] ?? '').toString();
+              final String lastName = (profile['last_name'] ?? '').toString();
+              final String fullName = (firstName + ' ' + lastName).trim();
+              booking['customer_name'] = fullName.isEmpty ? 'Customer' : fullName;
+              booking['customer_email'] = (profile['email'] ?? '');
+              booking['customer_phone'] = (profile['phone_number'] ?? '');
+            }
+          }
+        }
+      } catch (e) {
+        // If RLS blocks access or any error occurs, keep placeholders
+        print('Could not enrich bookings with user_profiles due to: $e');
+      }
 
       return bookings;
     } catch (e) {

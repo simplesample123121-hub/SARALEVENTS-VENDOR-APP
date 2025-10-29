@@ -424,6 +424,7 @@ class _ServicesScreenState extends State<ServicesScreen> with TickerProviderStat
           return _ServiceCard(
             item: item,
             onOpen: () => _openService(item),
+            onEdit: () => _openEditService(item),
             onDelete: () => _deleteService(item),
             onToggleEnabled: (v) async {
               await _serviceService.toggleServiceStatus(item.id, v);
@@ -489,6 +490,7 @@ class _ServicesScreenState extends State<ServicesScreen> with TickerProviderStat
                 item: service,
                 categoryName: categoryName,
                 onOpen: () => _openService(service),
+                onEdit: () => _openEditService(service),
                 onDelete: () => _deleteService(service),
                 onToggleEnabled: (v) async {
                   await _serviceService.toggleServiceStatus(service.id, v);
@@ -581,6 +583,7 @@ class _ServicesScreenState extends State<ServicesScreen> with TickerProviderStat
                 item: service,
                 categoryName: categoryName,
                 onOpen: () => _openService(service),
+                onEdit: () => _openEditService(service),
                 onDelete: () => _deleteService(service),
                 onToggleEnabled: (v) async {
                   await _serviceService.toggleServiceStatus(service.id, v);
@@ -981,6 +984,18 @@ class _ServicesScreenState extends State<ServicesScreen> with TickerProviderStat
     );
   }
 
+  void _openEditService(ServiceItem item) {
+    Navigator.of(context).push(
+      MaterialPageRoute(builder: (_) => _EditServicePage(item: item)),
+    ).then((changed) async {
+      if (changed == true) {
+        await _forceRefreshServicesData();
+      }
+    });
+  }
+
+  
+
   // Removed chip helpers
 
   void _selectCategoryChip(CategoryNode? node) {
@@ -1114,6 +1129,7 @@ class _TrashIcon extends StatelessWidget {
 class _ServiceCard extends StatefulWidget {
   final ServiceItem item;
   final VoidCallback onOpen;
+  final VoidCallback? onEdit;
   final VoidCallback onDelete;
   final ValueChanged<bool> onToggleEnabled;
   final VoidCallback? onOpenAvailability;
@@ -1122,7 +1138,7 @@ class _ServiceCard extends StatefulWidget {
   final bool isSelected;
   final ValueChanged<bool?>? onSelectedChanged;
   final VoidCallback? onLongPressSelect;
-  const _ServiceCard({required this.item, required this.onOpen, required this.onDelete, required this.onToggleEnabled, this.onOpenAvailability, this.onMove, this.selectionMode = false, this.isSelected = false, this.onSelectedChanged, this.onLongPressSelect});
+  const _ServiceCard({required this.item, required this.onOpen, this.onEdit, required this.onDelete, required this.onToggleEnabled, this.onOpenAvailability, this.onMove, this.selectionMode = false, this.isSelected = false, this.onSelectedChanged, this.onLongPressSelect});
 
   @override
   State<_ServiceCard> createState() => _ServiceCardState();
@@ -1273,7 +1289,7 @@ class _ServiceCardState extends State<_ServiceCard> {
                 Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    TextButton(onPressed: widget.onOpen, child: const Text('Edit')),
+                    TextButton(onPressed: widget.onEdit ?? widget.onOpen, child: const Text('Edit')),
                     if (widget.onOpenAvailability != null)
                       TextButton(onPressed: widget.onOpenAvailability, child: const Text('Availability')),
                     TextButton(
@@ -1302,6 +1318,7 @@ class _ServiceCardWithCategory extends StatelessWidget {
   final ServiceItem item;
   final String categoryName;
   final VoidCallback onOpen;
+  final VoidCallback? onEdit;
   final VoidCallback onDelete;
   final ValueChanged<bool> onToggleEnabled;
   final ValueChanged<bool>? onToggleVisibility;
@@ -1310,6 +1327,7 @@ class _ServiceCardWithCategory extends StatelessWidget {
     required this.item,
     required this.categoryName,
     required this.onOpen,
+    this.onEdit,
     required this.onDelete,
     required this.onToggleEnabled,
     this.onToggleVisibility,
@@ -1435,7 +1453,7 @@ class _ServiceCardWithCategory extends StatelessWidget {
                 Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    TextButton(onPressed: onOpen, child: const Text('Edit')),
+                    TextButton(onPressed: onEdit ?? onOpen, child: const Text('Edit')),
                     FilledButton.tonal(onPressed: onOpen, child: const Text('Open')),
                   ],
                 ),
@@ -1676,6 +1694,272 @@ class MediaGalleryPage extends StatelessWidget {
             ),
           );
         },
+      ),
+    );
+  }
+}
+
+class _EditServicePage extends StatefulWidget {
+  final ServiceItem item;
+  const _EditServicePage({required this.item});
+
+  @override
+  State<_EditServicePage> createState() => _EditServicePageState();
+}
+
+class _EditServicePageState extends State<_EditServicePage> {
+  final _formKey = GlobalKey<FormState>();
+  late TextEditingController _priceCtrl;
+  late TextEditingController _descCtrl;
+  late TextEditingController _tagCtrl;
+  late List<String> _tags;
+  late bool _enabled;
+  late bool _isVisibleToUsers;
+  final ServiceService _service = ServiceService();
+  final List<MediaItem> _media = <MediaItem>[];
+
+  @override
+  void initState() {
+    super.initState();
+    _priceCtrl = TextEditingController(text: widget.item.price.toStringAsFixed(0));
+    _descCtrl = TextEditingController(text: widget.item.description);
+    _tagCtrl = TextEditingController();
+    _tags = List<String>.from(widget.item.tags);
+    _enabled = widget.item.enabled;
+    _isVisibleToUsers = widget.item.isVisibleToUsers;
+    _media.addAll(widget.item.media);
+  }
+
+  @override
+  void dispose() {
+    _priceCtrl.dispose();
+    _descCtrl.dispose();
+    _tagCtrl.dispose();
+    super.dispose();
+  }
+
+  void _addTagsFromInput() {
+    final raw = _tagCtrl.text.trim();
+    if (raw.isEmpty) return;
+    for (final part in raw.split(',')) {
+      final t = part.trim();
+      if (t.isNotEmpty && !_tags.contains(t)) _tags.add(t);
+    }
+    _tagCtrl.clear();
+    setState(() {});
+  }
+
+  Future<void> _pickImages() async {
+    final picker = ImagePicker();
+    final files = await picker.pickMultiImage();
+    if (files.isNotEmpty) {
+      setState(() {
+        for (final f in files) {
+          _media.add(MediaItem(url: f.path, type: MediaType.image));
+        }
+      });
+    }
+  }
+
+  Future<void> _pickVideo() async {
+    final picker = ImagePicker();
+    final f = await picker.pickVideo(source: ImageSource.gallery);
+    if (f != null) {
+      setState(() => _media.add(MediaItem(url: f.path, type: MediaType.video)));
+    }
+  }
+
+  Future<void> _addMediaUrl() async {
+    final urlCtrl = TextEditingController();
+    MediaType selected = MediaType.image;
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Add media from URL'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextField(controller: urlCtrl, decoration: const InputDecoration(labelText: 'URL')),
+            const SizedBox(height: 8),
+            DropdownButtonFormField<MediaType>(
+              value: selected,
+              items: const [
+                DropdownMenuItem(value: MediaType.image, child: Text('Image')),
+                DropdownMenuItem(value: MediaType.video, child: Text('Video')),
+              ],
+              onChanged: (v) => selected = v ?? MediaType.image,
+              decoration: const InputDecoration(labelText: 'Type'),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancel')),
+          FilledButton(onPressed: () => Navigator.pop(context, true), child: const Text('Add')),
+        ],
+      ),
+    );
+    if (ok == true && urlCtrl.text.trim().isNotEmpty) {
+      setState(() => _media.add(MediaItem(url: urlCtrl.text.trim(), type: selected)));
+    }
+  }
+
+  void _removeMediaAt(int index) {
+    setState(() => _media.removeAt(index));
+  }
+
+  Future<void> _save() async {
+    if (!_formKey.currentState!.validate()) return;
+    final double? price = double.tryParse(_priceCtrl.text.trim());
+    final updates = <String, dynamic>{
+      // title/name intentionally excluded
+      'price': price,
+      'description': _descCtrl.text.trim(),
+      'tags': _tags,
+      'is_active': _enabled,
+      'is_visible_to_users': _isVisibleToUsers,
+      'media_urls': _media.map((m) => m.url).toList(),
+    };
+    updates.removeWhere((k, v) => v == null);
+    final ok = await _service.updateService(widget.item.id, updates);
+    if (ok && mounted) {
+      Navigator.of(context).pop(true);
+    } else if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Failed to save service')));
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: Text(widget.item.name),
+        actions: [
+          TextButton(onPressed: _save, child: const Text('Save')),
+        ],
+      ),
+      body: SingleChildScrollView(
+        padding: const EdgeInsets.all(16),
+        child: Form(
+          key: _formKey,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text('Media'),
+              const SizedBox(height: 8),
+              Row(
+                children: [
+                  FilledButton.icon(onPressed: _pickImages, icon: const Icon(Icons.image), label: const Text('Add Images')),
+                  const SizedBox(width: 8),
+                  FilledButton.icon(onPressed: _pickVideo, icon: const Icon(Icons.videocam), label: const Text('Add Video')),
+                ],
+              ),
+              const SizedBox(height: 8),
+              TextButton.icon(onPressed: _addMediaUrl, icon: const Icon(Icons.link), label: const Text('Add via URL')),
+              const SizedBox(height: 12),
+              if (_media.isNotEmpty)
+                GridView.builder(
+                  shrinkWrap: true,
+                  physics: const NeverScrollableScrollPhysics(),
+                  itemCount: _media.length,
+                  gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                    crossAxisCount: 3,
+                    crossAxisSpacing: 8,
+                    mainAxisSpacing: 8,
+                  ),
+                  itemBuilder: (context, i) {
+                    final m = _media[i];
+                    return Stack(
+                      children: [
+                        ClipRRect(
+                          borderRadius: BorderRadius.circular(8),
+                          child: Container(
+                            color: Colors.grey[200],
+                            child: m.type == MediaType.image
+                                ? (m.url.startsWith('http') || kIsWeb
+                                    ? Image.network(m.url, fit: BoxFit.cover)
+                                    : Image.file(File(m.url), fit: BoxFit.cover))
+                                : const Center(child: Icon(Icons.play_circle_fill, size: 36, color: Colors.black54)),
+                          ),
+                        ),
+                        Positioned(
+                          top: 4,
+                          right: 4,
+                          child: InkResponse(
+                            onTap: () => _removeMediaAt(i),
+                            radius: 18,
+                            child: Container(
+                              padding: const EdgeInsets.all(4),
+                              decoration: BoxDecoration(color: Colors.black.withValues(alpha: 0.6), shape: BoxShape.circle),
+                              child: const Icon(Icons.close, color: Colors.white, size: 16),
+                            ),
+                          ),
+                        )
+                      ],
+                    );
+                  },
+                ),
+              const SizedBox(height: 16),
+              TextFormField(
+                controller: _priceCtrl,
+                decoration: const InputDecoration(labelText: 'Price (₹)'),
+                keyboardType: TextInputType.number,
+                validator: (v) => (double.tryParse(v ?? '') == null) ? 'Enter valid price' : null,
+              ),
+              const SizedBox(height: 12),
+              TextFormField(
+                controller: _descCtrl,
+                minLines: 3,
+                maxLines: 6,
+                decoration: const InputDecoration(labelText: 'Description'),
+              ),
+              const SizedBox(height: 12),
+              Wrap(
+                spacing: 6,
+                runSpacing: 6,
+                children: [
+                  for (final t in _tags)
+                    Chip(
+                      label: Text(t),
+                      onDeleted: () {
+                        setState(() => _tags.remove(t));
+                      },
+                    ),
+                ],
+              ),
+              Row(
+                children: [
+                  Expanded(
+                    child: TextField(
+                      controller: _tagCtrl,
+                      decoration: const InputDecoration(labelText: 'Add tags (comma separated)'),
+                      onSubmitted: (_) => _addTagsFromInput(),
+                    ),
+                  ),
+                  IconButton(onPressed: _addTagsFromInput, icon: const Icon(Icons.add)),
+                ],
+              ),
+              const SizedBox(height: 12),
+              SwitchListTile(
+                value: _enabled,
+                onChanged: (v) => setState(() => _enabled = v),
+                title: const Text('Enabled'),
+              ),
+              SwitchListTile(
+                value: _isVisibleToUsers,
+                onChanged: (v) => setState(() => _isVisibleToUsers = v),
+                title: const Text('Visible to users'),
+              ),
+              const SizedBox(height: 20),
+              const Text('Availability'),
+              const SizedBox(height: 8),
+              AvailabilityCalendar(
+                serviceId: widget.item.id,
+                availabilityService: AvailabilityService(),
+                isViewMode: false,
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }

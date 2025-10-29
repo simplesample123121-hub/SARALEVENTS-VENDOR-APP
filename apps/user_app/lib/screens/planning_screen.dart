@@ -240,10 +240,8 @@ class _PlanningScreenState extends State<PlanningScreen>
     return LayoutBuilder(
       builder: (context, constraints) {
         final double width = constraints.maxWidth;
-        final int crossAxisCount = width >= 900 ? 3 : 2;
         final double containerPadding = width >= 700 ? 20 : 16;
         final double spacing = width >= 700 ? 16 : 12;
-        final double childAspectRatio = width >= 700 ? 4.2 : 3.8;
 
         return Container(
           margin: EdgeInsets.all(containerPadding),
@@ -270,19 +268,72 @@ class _PlanningScreenState extends State<PlanningScreen>
                 ),
               ),
               SizedBox(height: spacing),
-              GridView.count(
-                shrinkWrap: true,
-                physics: const NeverScrollableScrollPhysics(),
-                crossAxisCount: crossAxisCount,
-                mainAxisSpacing: spacing,
-                crossAxisSpacing: spacing,
-                childAspectRatio: childAspectRatio,
-                children: tools.map((t) => _buildToolCard(
-                  icon: t.icon,
-                  label: t.label,
-                  color: t.color,
-                  onTap: t.onTap,
-                )).toList(),
+              // Use a custom grid layout for 5 items: 2-2-1 pattern
+              Column(
+                children: [
+                  // First row: 2 items
+                  Row(
+                    children: [
+                      Expanded(
+                        child: _buildToolCard(
+                          icon: tools[0].icon,
+                          label: tools[0].label,
+                          color: tools[0].color,
+                          onTap: tools[0].onTap,
+                        ),
+                      ),
+                      SizedBox(width: spacing),
+                      Expanded(
+                        child: _buildToolCard(
+                          icon: tools[1].icon,
+                          label: tools[1].label,
+                          color: tools[1].color,
+                          onTap: tools[1].onTap,
+                        ),
+                      ),
+                    ],
+                  ),
+                  SizedBox(height: spacing),
+                  // Second row: 2 items
+                  Row(
+                    children: [
+                      Expanded(
+                        child: _buildToolCard(
+                          icon: tools[2].icon,
+                          label: tools[2].label,
+                          color: tools[2].color,
+                          onTap: tools[2].onTap,
+                        ),
+                      ),
+                      SizedBox(width: spacing),
+                      Expanded(
+                        child: _buildToolCard(
+                          icon: tools[3].icon,
+                          label: tools[3].label,
+                          color: tools[3].color,
+                          onTap: tools[3].onTap,
+                        ),
+                      ),
+                    ],
+                  ),
+                  SizedBox(height: spacing),
+                  // Third row: 1 item left-aligned with same width
+                  Row(
+                    children: [
+                      Expanded(
+                        child: _buildToolCard(
+                          icon: tools[4].icon,
+                          label: tools[4].label,
+                          color: tools[4].color,
+                          onTap: tools[4].onTap,
+                        ),
+                      ),
+                      Expanded(
+                        child: Container(), // Empty space to maintain layout
+                      ),
+                    ],
+                  ),
+                ],
               ),
             ],
           ),
@@ -301,14 +352,14 @@ class _PlanningScreenState extends State<PlanningScreen>
       onTap: onTap,
       borderRadius: BorderRadius.circular(12),
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
         decoration: BoxDecoration(
           color: color.withValues(alpha: 0.08),
           borderRadius: BorderRadius.circular(12),
           border: Border.all(color: color.withValues(alpha: 0.2)),
         ),
         child: ConstrainedBox(
-          constraints: const BoxConstraints(minHeight: 56),
+          constraints: const BoxConstraints(minHeight: 44),
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.center,
             children: [

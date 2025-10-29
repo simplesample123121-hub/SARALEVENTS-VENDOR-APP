@@ -1,10 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:cached_network_image/cached_network_image.dart';
+import 'package:flutter/services.dart';
 import '../models/service_models.dart';
 import '../services/service_service.dart';
 import 'service_details_screen.dart';
 import '../widgets/wishlist_button.dart';
+import '../core/input_formatters.dart';
+import 'select_location_screen.dart';
+import '../utils/category_mapping_helper.dart';
 
 
 class CatalogScreen extends StatefulWidget {
@@ -26,10 +30,12 @@ class CatalogScreen extends StatefulWidget {
 class _CatalogScreenState extends State<CatalogScreen> {
   final SupabaseClient _supabase = Supabase.instance.client;
   late final ServiceService _serviceService;
+  final FocusNode _searchFocusNode = FocusNode();
 
   List<ServiceItem> _services = <ServiceItem>[]; // filtered view
   List<ServiceItem> _allServices = <ServiceItem>[]; // original
   String? _selectedCategoryId;
+  String? _selectedVendorCategory; // For vendor category filter
   bool _isLoading = true;
   String _query = '';
   String? _error;
@@ -51,6 +57,11 @@ class _CatalogScreenState extends State<CatalogScreen> {
     if (widget.selectedCategory != null) {
       _selectedCategoryId = widget.selectedCategory;
     }
+    
+    // Listen to focus changes to update border color
+    _searchFocusNode.addListener(() {
+      setState(() {});
+    });
   }
 
   Future<void> _load() async {
@@ -201,8 +212,15 @@ class _CatalogScreenState extends State<CatalogScreen> {
     }
   }
 
-  void _applyFilters() {
+  void _applyFilters() async {
     var list = List<ServiceItem>.from(_allServices);
+    
+    // Filter by vendor category if selected
+    if (_selectedVendorCategory != null) {
+      final filteredServices = await _loadServicesByVendorCategory(_selectedVendorCategory!);
+      list = filteredServices;
+    }
+    
     // price filter
     if (_currentMinPrice != null && _currentMaxPrice != null) {
       list = list
@@ -216,90 +234,378 @@ class _CatalogScreenState extends State<CatalogScreen> {
     if (_query.isNotEmpty) {
       list = list.where((s) => s.name.toLowerCase().contains(_query.toLowerCase())).toList();
     }
+    
+    setState(() {
     _services = list;
+    });
   }
 
-  void _openFilterSheet() {
+  void _openFilterSheet() async {
     final minP = _minPrice ?? 0;
     final maxP = _maxPrice ?? 100000;
     double tempMin = _currentMinPrice ?? minP;
     double tempMax = _currentMaxPrice ?? maxP;
-    double tempRating = _minRating;
+    String selectedCategory = 'All Categories';
+    
+    // Create controllers for the price input fields
+    final TextEditingController minController = TextEditingController(text: '₹ ${tempMin.toStringAsFixed(0)}');
+    final TextEditingController maxController = TextEditingController(text: '₹ ${tempMax.toStringAsFixed(0)}');
+    
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
-      ),
+      backgroundColor: Colors.transparent,
       builder: (context) {
-        return Padding(
-          padding: EdgeInsets.only(
-            bottom: MediaQuery.of(context).viewInsets.bottom + 16,
-            left: 16,
-            right: 16,
-            top: 16,
+        return Container(
+          height: MediaQuery.of(context).size.height * 0.7,
+          decoration: const BoxDecoration(
+            color: Color(0xFFF5F5DC), // Light beige/off-white background
+            borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
           ),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
           child: StatefulBuilder(
             builder: (context, setLocal) => Column(
-              mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
+                  // Header
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    const Text('Filters', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700)),
-                    IconButton(onPressed: () => Navigator.pop(context), icon: const Icon(Icons.close)),
-                  ],
+                      const Text(
+                        'Filters',
+                        style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700, color: Colors.black87),
+                      ),
+                      IconButton(
+                        onPressed: () => Navigator.pop(context),
+                        icon: const Icon(Icons.close, color: Colors.black87),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 16),
+                  
+                  // Update Location Button
+                  GestureDetector(
+                    onTap: () {
+                      Navigator.pop(context);
+                      Navigator.of(context).push(
+                        MaterialPageRoute(
+                          builder: (context) => const SelectLocationScreen(),
+                        ),
+                      );
+                    },
+                    child: Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFFDBB42).withOpacity(0.15),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: const Color(0xFFFDBB42), width: 1.5),
+                      ),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(Icons.location_on, color: const Color(0xFFFF9800), size: 18),
+                          const SizedBox(width: 8),
+                          Text(
+                            'Update Location',
+                            style: TextStyle(
+                              color: const Color(0xFFFF9800),
+                              fontWeight: FontWeight.w600,
+                              fontSize: 14,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 20),
+                  
+                  // Category Section
+                  const Text(
+                    'Category',
+                    style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600, color: Colors.black87),
                 ),
                 const SizedBox(height: 8),
-                const Text('Price range'),
-                RangeSlider(
-                  values: RangeValues(tempMin.clamp(minP, maxP), tempMax.clamp(minP, maxP)),
-                  min: minP,
-                  max: maxP,
-                  divisions: 20,
-                  labels: RangeLabels('₹${tempMin.toStringAsFixed(0)}', '₹${tempMax.toStringAsFixed(0)}'),
-                  onChanged: (v) => setLocal(() { tempMin = v.start; tempMax = v.end; }),
-                ),
-                Row(
+                  GestureDetector(
+                    onTap: () {
+                      // Show category selection sheet with app categories
+                      showModalBottomSheet(
+                        context: context,
+                        backgroundColor: Colors.white,
+                        shape: const RoundedRectangleBorder(
+                          borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+                        ),
+                        builder: (context) => Container(
+                          padding: const EdgeInsets.all(20),
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              const Text(
+                                'Select Category',
+                                style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
+                              ),
+                              const SizedBox(height: 16),
+                              ListTile(
+                                title: const Text('All Categories'),
+                                onTap: () {
+                                  setLocal(() {
+                                    selectedCategory = 'All Categories';
+                                    _selectedVendorCategory = null;
+                                  });
+                                  Navigator.pop(context);
+                                },
+                              ),
+                              ...CategoryMappingHelper.availableCategories.map((category) => ListTile(
+                                title: Text(category),
+                                onTap: () {
+                                  setLocal(() {
+                                    selectedCategory = category;
+                                    _selectedVendorCategory = category;
+                                  });
+                                  Navigator.pop(context);
+                                },
+                              )),
+                            ],
+                          ),
+                        ),
+                      );
+                    },
+                    child: Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 16),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: Colors.grey.shade300, width: 1),
+                      ),
+                      child: Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    Text('Min: ₹${tempMin.toStringAsFixed(0)}'),
-                    Text('Max: ₹${tempMax.toStringAsFixed(0)}'),
-                  ],
-                ),
-                const SizedBox(height: 12),
-                const Text('Rating'),
-                Slider(
-                  value: tempRating,
-                  onChanged: (v) => setLocal(() { tempRating = v; }),
-                  min: 0,
-                  max: 5,
-                  divisions: 5,
-                  label: '${tempRating.toStringAsFixed(1)}+',
-                ),
-                const SizedBox(height: 12),
+                          Text(
+                            selectedCategory,
+                            style: const TextStyle(color: Colors.black87, fontSize: 14),
+                          ),
+                          const Icon(Icons.keyboard_arrow_down, color: Colors.grey, size: 20),
+                        ],
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 20),
+                  
+                  // Price Range Section
+                  const Text(
+                    'Price Range',
+                    style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600, color: Colors.black87),
+                  ),
+                  const SizedBox(height: 8),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Text('Min', style: TextStyle(color: Colors.grey, fontSize: 13)),
+                            const SizedBox(height: 6),
+                            TextField(
+                              controller: minController,
+                              keyboardType: TextInputType.number,
+                              style: const TextStyle(fontSize: 14, color: Colors.black87),
+                              inputFormatters: [
+                                CurrencyInputFormatter(maxValue: maxP),
+                              ],
+                              decoration: InputDecoration(
+                                hintText: '₹ 1',
+                                hintStyle: TextStyle(color: Colors.grey.shade500, fontSize: 14),
+                                filled: true,
+                                fillColor: Colors.white,
+                                border: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(12),
+                                  borderSide: BorderSide(color: Colors.grey.shade300, width: 1),
+                                ),
+                                enabledBorder: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(12),
+                                  borderSide: BorderSide(color: Colors.grey.shade300, width: 1),
+                                ),
+                                focusedBorder: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(12),
+                                  borderSide: BorderSide(color: Colors.grey.shade300, width: 1),
+                                ),
+                                contentPadding: const EdgeInsets.symmetric(vertical: 12, horizontal: 14),
+                                isDense: true,
+                              ),
+                              onChanged: (value) {
+                                tempMin = double.tryParse(value.replaceAll('₹', '').replaceAll(',', '').trim()) ?? minP;
+                              },
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      const Padding(
+                        padding: EdgeInsets.only(top: 28),
+                        child: Text('to', style: TextStyle(color: Colors.black87, fontSize: 14)),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Text('Max', style: TextStyle(color: Colors.grey, fontSize: 13)),
+                            const SizedBox(height: 6),
+                            TextField(
+                              controller: maxController,
+                              keyboardType: TextInputType.number,
+                              style: const TextStyle(fontSize: 14, color: Colors.black87),
+                              inputFormatters: [
+                                CurrencyInputFormatter(maxValue: maxP),
+                              ],
+                              decoration: InputDecoration(
+                                hintText: '₹ 693939',
+                                hintStyle: TextStyle(color: Colors.grey.shade500, fontSize: 14),
+                                filled: true,
+                                fillColor: Colors.white,
+                                border: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(12),
+                                  borderSide: BorderSide(color: Colors.grey.shade300, width: 1),
+                                ),
+                                enabledBorder: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(12),
+                                  borderSide: BorderSide(color: Colors.grey.shade300, width: 1),
+                                ),
+                                focusedBorder: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(12),
+                                  borderSide: BorderSide(color: Colors.grey.shade300, width: 1),
+                                ),
+                                contentPadding: const EdgeInsets.symmetric(vertical: 12, horizontal: 14),
+                                isDense: true,
+                              ),
+                              onChanged: (value) {
+                                tempMax = double.tryParse(value.replaceAll('₹', '').replaceAll(',', '').trim()) ?? maxP;
+                              },
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 20),
+                  
+                  // Quick Select Section
+                  const Text(
+                    'Quick Select',
+                    style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600, color: Colors.black87),
+                  ),
+                  const SizedBox(height: 8),
+                  Expanded(
+                    child: GridView.count(
+                      crossAxisCount: 2,
+                      crossAxisSpacing: 6,
+                      mainAxisSpacing: 6,
+                      childAspectRatio: 3.5,
+                      children: [
+                        _buildQuickSelectButton('Under ₹10,000', () {
+                          setLocal(() {
+                            tempMin = 0;
+                            tempMax = 10000;
+                            minController.text = '₹ 0';
+                            maxController.text = '₹ 10000';
+                          });
+                        }),
+                        _buildQuickSelectButton('₹10,000 - ₹25,000', () {
+                          setLocal(() {
+                            tempMin = 10000;
+                            tempMax = 25000;
+                            minController.text = '₹ 10000';
+                            maxController.text = '₹ 25000';
+                          });
+                        }),
+                        _buildQuickSelectButton('₹25,000 - ₹50,000', () {
+                          setLocal(() {
+                            tempMin = 25000;
+                            tempMax = 50000;
+                            minController.text = '₹ 25000';
+                            maxController.text = '₹ 50000';
+                          });
+                        }),
+                        _buildQuickSelectButton('₹50,000 - ₹1,00,000', () {
+                          setLocal(() {
+                            tempMin = 50000;
+                            tempMax = 100000;
+                            minController.text = '₹ 50000';
+                            maxController.text = '₹ 100000';
+                          });
+                        }),
+                        _buildQuickSelectButton('Above ₹1,00,000', () {
+                          setLocal(() {
+                            tempMin = 100000;
+                            tempMax = maxP;
+                            minController.text = '₹ 100000';
+                            maxController.text = '₹ ${maxP.toStringAsFixed(0)}';
+                          });
+                        }),
+                      ],
+                    ),
+                  ),
+                  
+                  // Apply Filters Button
                 SizedBox(
                   width: double.infinity,
-                  child: FilledButton(
+                    child: ElevatedButton(
                     onPressed: () {
                       setState(() {
                         _currentMinPrice = tempMin;
                         _currentMaxPrice = tempMax;
-                        _minRating = tempRating;
                         _applyFilters();
                       });
                       Navigator.pop(context);
                     },
-                    child: const Text('Apply filters'),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFFFDBB42),
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(vertical: 16),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                      ),
+                      child: const Text(
+                        'Apply Filters',
+                        style: TextStyle(fontWeight: FontWeight.w600),
+                      ),
+                    ),
                   ),
-                ),
-                const SizedBox(height: 8),
-              ],
+                ],
+              ),
             ),
           ),
         );
       },
+    );
+  }
+
+  Widget _buildQuickSelectButton(String text, VoidCallback onTap) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 6),
+        decoration: BoxDecoration(
+          color: Colors.grey.shade200,
+          borderRadius: BorderRadius.circular(8),
+        ),
+        child: Center(
+          child: Text(
+            text,
+            style: const TextStyle(
+              color: Colors.black87,
+              fontSize: 10,
+              fontWeight: FontWeight.w500,
+            ),
+            textAlign: TextAlign.center,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+          ),
+        ),
+      ),
     );
   }
 
@@ -339,8 +645,10 @@ class _CatalogScreenState extends State<CatalogScreen> {
                 decoration: BoxDecoration(
                   color: Colors.white,
                   borderRadius: BorderRadius.circular(12),
-                  boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 10, offset: const Offset(0, 4))],
-                  border: Border.all(color: Colors.black.withOpacity(0.05)),
+                  border: Border.all(
+                    color: const Color(0xFFFDBB42),
+                    width: 1,
+                  ),
                 ),
                 child: Row(
                   children: [
@@ -349,10 +657,16 @@ class _CatalogScreenState extends State<CatalogScreen> {
                     const SizedBox(width: 8),
                     Expanded(
                       child: TextField(
+                        focusNode: _searchFocusNode,
                         decoration: const InputDecoration(
                           hintText: 'Search',
                           isCollapsed: true,
                           border: InputBorder.none,
+                          enabledBorder: InputBorder.none,
+                          focusedBorder: InputBorder.none,
+                          filled: true,
+                          fillColor: Colors.white,
+                          contentPadding: EdgeInsets.symmetric(vertical: 12),
                         ),
                         onChanged: (value) {
                           _query = value.trim();
@@ -496,5 +810,11 @@ class _CatalogScreenState extends State<CatalogScreen> {
         ),
       ],
     );
+  }
+
+  @override
+  void dispose() {
+    _searchFocusNode.dispose();
+    super.dispose();
   }
 }

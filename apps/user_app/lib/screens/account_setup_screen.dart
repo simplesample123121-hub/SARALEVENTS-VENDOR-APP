@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../core/session.dart';
 import '../services/profile_service.dart';
+import '../core/input_formatters.dart';
 
 class AccountSetupScreen extends StatefulWidget {
   const AccountSetupScreen({super.key});
@@ -138,7 +139,10 @@ class _AccountSetupScreenState extends State<AccountSetupScreen> {
                                   prefixIcon: Icon(Icons.person_outline),
                                 ),
                                 textInputAction: TextInputAction.next,
-                                validator: (v) => (v == null || v.trim().isEmpty) ? 'Enter username' : null,
+                                inputFormatters: [NoEmojiTextInputFormatter()],
+                                keyboardType: TextInputType.name,
+                                textCapitalization: TextCapitalization.words,
+                                validator: Validators.personName,
                               ),
                               const SizedBox(height: 12),
                               TextFormField(
@@ -157,6 +161,8 @@ class _AccountSetupScreenState extends State<AccountSetupScreen> {
                                   labelText: 'Phone number',
                                   prefixIcon: Icon(Icons.phone_outlined),
                                 ),
+                                inputFormatters: [E164PhoneInputFormatter(maxLength: 15)],
+                                validator: Validators.phone,
                               ),
                               const SizedBox(height: 12),
                               DropdownButtonFormField<String>(

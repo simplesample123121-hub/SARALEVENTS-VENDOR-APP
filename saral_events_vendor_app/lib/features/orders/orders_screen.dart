@@ -530,45 +530,67 @@ class _OrdersScreenState extends State<OrdersScreen> with TickerProviderStateMix
   }
 
   Widget _buildActionButtons(Map<String, dynamic> booking, String status) {
-    return Wrap(
-      spacing: 8,
-      runSpacing: 8,
-      alignment: WrapAlignment.end,
-      children: [
-        if (status == 'pending') ...[
-          ElevatedButton.icon(
+    // Use a Row with Expanded buttons for consistent alignment and spacing
+    final List<Widget> primaryButtons = [];
+    if (status == 'pending') {
+      primaryButtons.addAll([
+        Expanded(
+          child: ElevatedButton.icon(
             onPressed: () => _updateBookingStatus(booking['id'], 'confirmed'),
             icon: const Icon(Icons.check, size: 16),
             label: const Text('Confirm'),
             style: ElevatedButton.styleFrom(
               backgroundColor: Colors.green,
               foregroundColor: Colors.white,
+              minimumSize: const Size.fromHeight(44),
             ),
           ),
-          OutlinedButton.icon(
+        ),
+        const SizedBox(width: 12),
+        Expanded(
+          child: OutlinedButton.icon(
             onPressed: () => _updateBookingStatus(booking['id'], 'cancelled'),
             icon: const Icon(Icons.close, size: 16),
             label: const Text('Cancel'),
             style: OutlinedButton.styleFrom(
               foregroundColor: Colors.red,
               side: const BorderSide(color: Colors.red),
+              minimumSize: const Size.fromHeight(44),
             ),
           ),
-        ] else if (status == 'confirmed') ...[
-          ElevatedButton.icon(
+        ),
+      ]);
+    } else if (status == 'confirmed') {
+      primaryButtons.add(
+        Expanded(
+          child: ElevatedButton.icon(
             onPressed: () => _updateBookingStatus(booking['id'], 'completed'),
             icon: const Icon(Icons.done_all, size: 16),
             label: const Text('Mark Complete'),
             style: ElevatedButton.styleFrom(
               backgroundColor: Colors.blue,
               foregroundColor: Colors.white,
+              minimumSize: const Size.fromHeight(44),
             ),
           ),
+        ),
+      );
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        if (primaryButtons.isNotEmpty) ...[
+          Row(children: primaryButtons),
+          const SizedBox(height: 12),
         ],
-        OutlinedButton.icon(
-          onPressed: () => _showStatusUpdateDialog(booking),
-          icon: const Icon(Icons.edit, size: 16),
-          label: const Text('Update Status'),
+        Align(
+          alignment: Alignment.centerRight,
+          child: OutlinedButton.icon(
+            onPressed: () => _showStatusUpdateDialog(booking),
+            icon: const Icon(Icons.edit, size: 16),
+            label: const Text('Update Status'),
+          ),
         ),
       ],
     );

@@ -305,6 +305,192 @@ class _AvailabilityCalendarState extends State<AvailabilityCalendar> {
     }
   }
 
+  Future<void> _applyCustomAvailableWindow(DateTime day, String startHHmm, String endHHmm) async {
+    // Interpret [start, end) as AVAILABLE window; remaining time is booked (unavailable)
+    final start = _parseTimeOfDay(startHHmm);
+    final end = _parseTimeOfDay(endHHmm);
+
+    int minutes(TimeOfDay t) => t.hour * 60 + t.minute;
+
+    // Define slot windows
+    final sMorning = TimeOfDay(hour: 6, minute: 0), eMorning = TimeOfDay(hour: 12, minute: 0);
+    final sAfternoon = TimeOfDay(hour: 12, minute: 0), eAfternoon = TimeOfDay(hour: 17, minute: 0);
+    final sEvening = TimeOfDay(hour: 17, minute: 0), eEvening = TimeOfDay(hour: 21, minute: 0);
+    final sNight1 = TimeOfDay(hour: 21, minute: 0), eNight1 = TimeOfDay(hour: 24 % 24, minute: 0);
+    final sNight2 = TimeOfDay(hour: 0, minute: 0), eNight2 = TimeOfDay(hour: 6, minute: 0);
+
+    bool availableOverlap(TimeOfDay slotStart, TimeOfDay slotEnd) {
+      if (minutes(start) <= minutes(end)) {
+        return _overlaps(start, end, slotStart, slotEnd);
+      }
+      // wrap available window spans midnight
+      final wrapStartA = start, wrapEndA = TimeOfDay(hour: 24 % 24, minute: 0);
+      final wrapStartB = const TimeOfDay(hour: 0, minute: 0), wrapEndB = end;
+      return _overlaps(wrapStartA, wrapEndA, slotStart, slotEnd) || _overlaps(wrapStartB, wrapEndB, slotStart, slotEnd);
+    }
+
+    final morningAvail = availableOverlap(sMorning, eMorning);
+    final afternoonAvail = availableOverlap(sAfternoon, eAfternoon);
+    final eveningAvail = availableOverlap(sEvening, eEvening);
+    final nightAvail = availableOverlap(sNight1, eNight1) || availableOverlap(sNight2, eNight2);
+
+    final up = ServiceAvailabilityOverride(
+      date: DateTime(day.year, day.month, day.day),
+      morningAvailable: morningAvail,
+      afternoonAvailable: afternoonAvail,
+      eveningAvailable: eveningAvail,
+      nightAvailable: nightAvail,
+      customStart: startHHmm,
+      customEnd: endHHmm,
+    );
+    setState(() {
+      _overrides[DateTime(day.year, day.month, day.day)] = up;
+    });
+    widget.controller?.setOverride(up);
+    if (widget.serviceId != null && widget.persistImmediately) {
+      await widget.availabilityService.upsertOverride(widget.serviceId!, up);
+    }
+  }
+
+  Future<void> _promptStatusAndTimes(BuildContext context, DateTime day) async {
+    final status = await showDialog<DayStatus>(
+      context: context,
+      builder: (ctx) => SimpleDialog(
+        title: Text('Set ${DateFormat('EEE, MMM d').format(day)}'),
+        children: [
+          SimpleDialogOption(
+            onPressed: () => Navigator.pop(ctx, DayStatus.available),
+            child: const Text('Available'),
+          ),
+          SimpleDialogOption(
+            onPressed: () => Navigator.pop(ctx, DayStatus.partial),
+            child: const Text('Partially Available'),
+          ),
+          SimpleDialogOption(
+            onPressed: () => Navigator.pop(ctx, DayStatus.booked),
+            child: const Text('Booked'),
+          ),
+        ],
+      ),
+    );
+    if (status == null) return;
+
+    if (status == DayStatus.booked) {
+      await _toggleFullDayBooked(day, true);
+      return;
+    }
+    // Multi-select slot chips flow
+    // Persist selection state across setState within the sheet
+    final Set<DaySlot> availableSel = <DaySlot>{};
+    final Set<DaySlot> bookedSel = <DaySlot>{};
+
+    await showModalBottomSheet(
+      context: context,
+      useSafeArea: true,
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(16))),
+      builder: (ctx) {
+        return DefaultTabController(
+          length: 1,
+          child: StatefulBuilder(
+            builder: (ctx, setS) {
+              String slotLabel(DaySlot s) {
+                switch (s) {
+                  case DaySlot.morning: return 'Morning';
+                  case DaySlot.afternoon: return 'Afternoon';
+                  case DaySlot.evening: return 'Evening';
+                  case DaySlot.night: return 'Night';
+                }
+              }
+
+              String slotTimeLabel(DaySlot s) {
+                switch (s) {
+                  case DaySlot.morning: return '06:00 - 12:00';
+                  case DaySlot.afternoon: return '12:00 - 17:00';
+                  case DaySlot.evening: return '17:00 - 21:00';
+                  case DaySlot.night: return '21:00 - 06:00';
+                }
+              }
+
+              Widget slotsChecklist(Set<DaySlot> target, {Color? color}) {
+                Widget tile(DaySlot s) => CheckboxListTile(
+                  value: target.contains(s),
+                  onChanged: (v) => setS(() { if (v == true) target.add(s); else target.remove(s); }),
+                  title: Text(slotLabel(s)),
+                  subtitle: Text(slotTimeLabel(s)),
+                  dense: true,
+                  controlAffinity: ListTileControlAffinity.leading,
+                  activeColor: color ?? Theme.of(context).colorScheme.primary,
+                );
+                return Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    tile(DaySlot.morning),
+                    tile(DaySlot.afternoon),
+                    tile(DaySlot.evening),
+                    tile(DaySlot.night),
+                  ],
+                );
+              }
+
+              Future<void> apply() async {
+                bool m = true, a = true, e = true, n = true;
+                if (status == DayStatus.available) {
+                  // If none selected, treat as full day available
+                  if (availableSel.isNotEmpty) {
+                    m = availableSel.contains(DaySlot.morning);
+                    a = availableSel.contains(DaySlot.afternoon);
+                    e = availableSel.contains(DaySlot.evening);
+                    n = availableSel.contains(DaySlot.night);
+                  }
+                } else {
+                  // Partial: available minus booked, booked overrides
+                  m = availableSel.contains(DaySlot.morning) && !bookedSel.contains(DaySlot.morning);
+                  a = availableSel.contains(DaySlot.afternoon) && !bookedSel.contains(DaySlot.afternoon);
+                  e = availableSel.contains(DaySlot.evening) && !bookedSel.contains(DaySlot.evening);
+                  n = availableSel.contains(DaySlot.night) && !bookedSel.contains(DaySlot.night);
+                }
+                final up = ServiceAvailabilityOverride(
+                  date: DateTime(day.year, day.month, day.day),
+                  morningAvailable: m,
+                  afternoonAvailable: a,
+                  eveningAvailable: e,
+                  nightAvailable: n,
+                );
+                setState(() {
+                  _overrides[DateTime(day.year, day.month, day.day)] = up;
+                });
+                widget.controller?.setOverride(up);
+                if (widget.serviceId != null && widget.persistImmediately) {
+                  await widget.availabilityService.upsertOverride(widget.serviceId!, up);
+                }
+                if (context.mounted) Navigator.pop(ctx);
+              }
+
+              return Padding(
+                padding: const EdgeInsets.all(16.0),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const SizedBox(height: 8),
+                    const Text('Select available slots'),
+                    const SizedBox(height: 4),
+                    slotsChecklist(availableSel, color: Colors.green),
+                    const SizedBox(height: 12),
+                    Align(
+                      alignment: Alignment.centerRight,
+                      child: FilledButton(onPressed: apply, child: const Text('Apply')),
+                    ),
+                  ],
+                ),
+              );
+            },
+          ),
+        );
+      },
+    );
+  }
+
   void _openDayEditor(BuildContext context, DateTime day) {
     final cur = _currentFor(day);
     showModalBottomSheet(
@@ -505,7 +691,7 @@ class _AvailabilityCalendarState extends State<AvailabilityCalendar> {
           if (_activePaintStatus != null) {
             await _applyStatus(day, _activePaintStatus!);
           } else {
-            _openDayEditor(context, day);
+            await _promptStatusAndTimes(context, day);
           }
         },
         onLongPress: () => _openDayEditor(context, day),
@@ -561,53 +747,7 @@ class _AvailabilityCalendarState extends State<AvailabilityCalendar> {
           _PartialDetailsCard(overrideFor: _currentFor(_selectedForDetails!)),
         ],
         const SizedBox(height: 12),
-        // Time row similar to screenshot (non-interactive display of current time)
-        Row(
-          children: [
-            const Text('Time', style: TextStyle(fontWeight: FontWeight.w600)),
-            const SizedBox(width: 8),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-              decoration: BoxDecoration(
-                color: Colors.grey.shade200,
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: Text(DateFormat('h:mm a').format(DateTime.now())),
-            )
-          ],
-        ),
         const SizedBox(height: 12),
-        // Mode selector chips: Booked | Available | Partially Available
-        Wrap(
-          spacing: 8,
-          children: [
-            FilterChip(
-              label: const Text('Booked'),
-              selected: _activePaintStatus == DayStatus.booked,
-              onSelected: (v) => setState(() => _activePaintStatus = v ? DayStatus.booked : null),
-              selectedColor: Colors.redAccent.withOpacity(0.15),
-              checkmarkColor: Colors.redAccent,
-              side: BorderSide(color: Colors.redAccent.withOpacity(0.5)),
-            ),
-            FilterChip(
-              label: const Text('Available'),
-              selected: _activePaintStatus == DayStatus.available,
-              onSelected: (v) => setState(() => _activePaintStatus = v ? DayStatus.available : null),
-              selectedColor: Colors.green.withOpacity(0.15),
-              checkmarkColor: Colors.green,
-              side: BorderSide(color: Colors.green.withOpacity(0.5)),
-            ),
-            FilterChip(
-              label: const Text('Partially Available'),
-              selected: _activePaintStatus == DayStatus.partial,
-              onSelected: (v) => setState(() => _activePaintStatus = v ? DayStatus.partial : null),
-              selectedColor: Colors.orangeAccent.withOpacity(0.15),
-              checkmarkColor: Colors.orangeAccent,
-              side: BorderSide(color: Colors.orangeAccent.withOpacity(0.5)),
-            ),
-          ],
-        ),
-        const SizedBox(height: 16),
         _Legend(),
       ],
     );
